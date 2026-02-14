@@ -190,7 +190,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700" />}>
       <LoginPageContent />
     </Suspense>
   );

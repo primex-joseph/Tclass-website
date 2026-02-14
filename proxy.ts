@@ -9,7 +9,7 @@ import {
   normalizeRole,
 } from "@/lib/auth";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const token = request.cookies.get(AUTH_COOKIE_TOKEN)?.value;
   const role = normalizeRole(request.cookies.get(AUTH_COOKIE_ROLE)?.value);

@@ -1,11 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable static export for deployment
-  output: 'export',
   distDir: 'dist',
-  
-  // Image optimization settings for static export
+
+  // Keep unoptimized images for simpler local/static asset handling.
   images: {
     unoptimized: true,
   },
