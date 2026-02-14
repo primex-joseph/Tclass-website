@@ -16,6 +16,8 @@ import {
   Award,
   BookOpen,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Menu,
   X,
   ExternalLink,
@@ -31,6 +33,7 @@ import toast from "react-hot-toast";
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [expandedProgramId, setExpandedProgramId] = useState<number | null>(null);
 
   const programs = [
     {
@@ -41,6 +44,25 @@ export default function LandingPage() {
       description: "School Based Training - Heavy Equipment Operation under TCLASS scholarship",
       duration: "3 months",
       slots: "Limited slots available",
+      qualifications: [
+        "At least High School or SHS Graduate/ALS passer/College level or graduate",
+        "18 years old and above",
+        "Physically and mentally fit",
+        "Can comply with all requirements needed",
+      ],
+      documentaryRequirements: [
+        "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+        "ALS Graduate: ALS Certificate",
+        "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+        "PSA Birth Certificate (photocopy)",
+        "PSA Marriage Certificate (for female married students)",
+        "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+        "Original Barangay Indigency",
+        "Original Medical Certificate",
+        "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+        "Long envelope with clear plastic envelope",
+        "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+      ],
       image: "/programs/dump-truck.jpg"
     },
     {
@@ -51,6 +73,25 @@ export default function LandingPage() {
       description: "Professional training for concrete mixer truck operation with minimal fee",
       duration: "3 months",
       slots: "Now accepting applicants",
+      qualifications: [
+        "At least High School or SHS Graduate/ALS passer/College level or graduate",
+        "18 years old and above",
+        "Physically and mentally fit",
+        "Can comply with all requirements needed",
+      ],
+      documentaryRequirements: [
+        "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+        "ALS Graduate: ALS Certificate",
+        "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+        "PSA Birth Certificate (photocopy)",
+        "PSA Marriage Certificate (for female married students)",
+        "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+        "Original Barangay Indigency",
+        "Original Medical Certificate",
+        "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+        "Long envelope with clear plastic envelope",
+        "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+      ],
       image: "/programs/transit-mixer.jpg"
     },
     {
@@ -61,6 +102,25 @@ export default function LandingPage() {
       description: "Comprehensive forklift operation training under maYAP Scholarship",
       duration: "2 months",
       slots: "Open for enrollment",
+      qualifications: [
+        "At least High School or SHS Graduate/ALS passer/College level or graduate",
+        "18 years old and above",
+        "Physically and mentally fit",
+        "Can comply with all requirements needed",
+      ],
+      documentaryRequirements: [
+        "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+        "ALS Graduate: ALS Certificate",
+        "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+        "PSA Birth Certificate (photocopy)",
+        "PSA Marriage Certificate (for female married students)",
+        "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+        "Original Barangay Indigency",
+        "Original Medical Certificate",
+        "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+        "Long envelope with clear plastic envelope",
+        "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+      ],
       image: "/programs/forklift.jpg"
     },
     {
@@ -71,7 +131,17 @@ export default function LandingPage() {
       description: "Information and Communication Technology diploma program",
       duration: "3 years",
       slots: "5 SLOTS LEFT!",
-      requirements: ["18 years old and above", "SHS/ALS Graduate", "Must meet interview requirements"],
+      qualifications: [
+        "18 years old and above",
+        "Graduate of Senior High School / ALS / Old Curriculum",
+        "Must meet interview requirements",
+      ],
+      documentaryRequirements: [
+        "Valid ID / Recent School ID",
+        "PSA Birth Certificate",
+        "SF9 / Report Card",
+        "Certificate of Good Moral Conduct",
+      ],
       image: "/programs/ict.jpg"
     },
     {
@@ -82,6 +152,24 @@ export default function LandingPage() {
       description: "Professional housekeeping training under maYAP Scholarship",
       duration: "2 months",
       slots: "Now open",
+      qualifications: [
+        "At least High School or SHS Graduate/ALS passer/College level or graduate",
+        "18 years old and above",
+        "Physically and mentally fit",
+        "Can comply with all requirements needed",
+      ],
+      documentaryRequirements: [
+        "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+        "ALS Graduate: ALS Certificate",
+        "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+        "PSA Birth Certificate (photocopy)",
+        "PSA Marriage Certificate (for female married students)",
+        "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+        "Original Barangay Indigency",
+        "Original Medical Certificate",
+        "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+        "Long envelope with clear plastic envelope",
+      ],
       image: "/programs/housekeeping.jpg"
     },
     {
@@ -92,6 +180,24 @@ export default function LandingPage() {
       description: "Comprehensive health care assistant training program",
       duration: "6 months",
       slots: "Limited slots",
+      qualifications: [
+        "At least High School or SHS Graduate/ALS passer/College level or graduate",
+        "18 years old and above",
+        "Physically and mentally fit",
+        "Can comply with all requirements needed",
+      ],
+      documentaryRequirements: [
+        "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+        "ALS Graduate: ALS Certificate",
+        "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+        "PSA Birth Certificate (photocopy)",
+        "PSA Marriage Certificate (for female married students)",
+        "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+        "Original Barangay Indigency",
+        "Original Medical Certificate",
+        "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+        "Long envelope with clear plastic envelope",
+      ],
       image: "/programs/healthcare.jpg"
     }
   ];
@@ -340,8 +446,13 @@ export default function LandingPage() {
       </section>
 
       {/* Programs Section */}
-      <section id="programs" className="py-20 bg-gradient-to-b from-blue-50/70 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="programs" className="relative py-20">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/tclass.jpg')" }}
+        />
+        <div className="absolute inset-0 bg-white/92" />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <Badge className="mb-4 bg-blue-100 text-blue-800">Our Programs</Badge>
             <h2 className="hero-title text-3xl md:text-4xl font-bold text-blue-950 mb-4">
@@ -375,20 +486,33 @@ export default function LandingPage() {
             ))}
           </div>
 
+          <h3 className="text-2xl md:text-3xl font-bold text-blue-950 mb-6">
+            Programs
+          </h3>
+
           {/* Programs Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPrograms.map((program) => (
-              <Card key={program.id} className="overflow-hidden elev-card group">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+            {filteredPrograms.map((program) => {
+              const isExpanded = expandedProgramId === program.id;
+
+              return (
+              <Card key={program.id} className="overflow-hidden elev-card group bg-white/95 backdrop-blur-sm border-slate-200">
                 <div className="h-48 bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
                   <program.icon className="h-20 w-20 text-white/80" />
                 </div>
                 <CardContent className="p-6">
                   <Badge className="mb-3 bg-yellow-100 text-yellow-800">{program.slots}</Badge>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
-                    {program.title}
-                  </h3>
-                  <p className="text-slate-600 text-sm mb-4">{program.description}</p>
-                  <div className="flex items-center justify-between text-sm text-slate-500 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedProgramId(isExpanded ? null : program.id)}
+                    className="w-full text-left"
+                  >
+                    <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
+                      {program.title}
+                    </h3>
+                  </button>
+                  <p className="text-slate-700 text-base mb-4">{program.description}</p>
+                  <div className="flex items-center justify-between text-base text-slate-700 mb-4">
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       {program.duration}
@@ -398,25 +522,45 @@ export default function LandingPage() {
                       NCII Certified
                     </span>
                   </div>
-                  {program.requirements && (
-                    <div className="mb-4">
-                      <p className="text-xs font-medium text-slate-500 mb-2">Requirements:</p>
-                      <ul className="text-xs text-slate-600 space-y-1">
-                        {program.requirements.map((req, idx) => (
-                          <li key={idx} className="flex items-start gap-1">
-                            <ChevronRight className="h-3 w-3 text-blue-500 mt-0.5" />
-                            {req}
-                          </li>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedProgramId(isExpanded ? null : program.id)}
+                    className="mb-4 inline-flex items-center gap-1 text-base font-semibold text-blue-800 hover:text-blue-950"
+                  >
+                    {isExpanded ? "Hide requirements" : "Show requirements"}
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  {isExpanded && (
+                  <div className="mb-4 max-h-64 overflow-y-auto pr-2">
+                    <p className="text-base font-semibold text-slate-900 mb-2">Qualification</p>
+                    <ul className="text-sm text-slate-800 space-y-1 mb-3">
+                      {program.qualifications.map((req, idx) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <ChevronRight className="h-3 w-3 text-blue-500 mt-0.5" />
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-base font-semibold text-slate-900 mb-2">Documentary Requirements</p>
+                    <ul className="text-sm text-slate-800 space-y-1">
+                      {program.documentaryRequirements.map((req, idx) => (
+                        <li key={idx} className="flex items-start gap-1">
+                          <ChevronRight className="h-3 w-3 text-blue-500 mt-0.5" />
+                          {req}
+                        </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  <Button className="w-full" onClick={() => toast.success(`Opening application for ${program.title}`)}>
-                    Apply Now
+                  {isExpanded && (
+                  <Button className="w-full" onClick={() => toast.success(`Opening enrollment for ${program.title}`)}>
+                    Enroll Now
                   </Button>
+                  )}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -597,10 +741,10 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#home" className="hover:text-white transition-colors">Home</a></li>
-                <li><a href="#about" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#programs" className="hover:text-white transition-colors">Programs</a></li>
-                <li><a href="#news" className="hover:text-white transition-colors">News</a></li>
+                <li><Link href="/" className="hover:text-white transition-colors">Home</Link></li>
+                <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
+                <li><Link href="/programs" className="hover:text-white transition-colors">Programs</Link></li>
+                <li><Link href="/news" className="hover:text-white transition-colors">News</Link></li>
                 <li><Link href="/login" className="hover:text-white transition-colors">Student Portal</Link></li>
               </ul>
             </div>
@@ -608,11 +752,11 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4">Programs</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#programs" className="hover:text-white transition-colors">Heavy Equipment</a></li>
-                <li><a href="#programs" className="hover:text-white transition-colors">ICT Diploma</a></li>
-                <li><a href="#programs" className="hover:text-white transition-colors">Housekeeping</a></li>
-                <li><a href="#programs" className="hover:text-white transition-colors">Health Care</a></li>
-                <li><a href="#programs" className="hover:text-white transition-colors">Scholarships</a></li>
+                <li><Link href="/programs/heavy-equipment" className="hover:text-white transition-colors">Heavy Equipment</Link></li>
+                <li><Link href="/programs/ict-diploma" className="hover:text-white transition-colors">ICT Diploma</Link></li>
+                <li><Link href="/programs/housekeeping" className="hover:text-white transition-colors">Housekeeping</Link></li>
+                <li><Link href="/programs/health-care" className="hover:text-white transition-colors">Health Care</Link></li>
+                <li><Link href="/programs/scholarships" className="hover:text-white transition-colors">Scholarships</Link></li>
               </ul>
             </div>
           </div>
