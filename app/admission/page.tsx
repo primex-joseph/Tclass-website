@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { submitAdmissionForm } from "@/lib/admission-submit";
 
 import { Badge } from "@/components/ui/badge";
@@ -265,7 +265,7 @@ export default function AdmissionPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="glass-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-4">
           <div>
             <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Registration Form</Badge>
             <h1 className="text-3xl font-semibold text-blue-950">Learner&apos;s Profile Form</h1>
@@ -277,7 +277,7 @@ export default function AdmissionPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">Learner ID Picture</CardTitle>
               <CardDescription>Attach learner ID picture (for profile and verification).</CardDescription>
@@ -293,7 +293,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">1. T2MIS Auto Generated</CardTitle>
             </CardHeader>
@@ -309,7 +309,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">2. Learner/Manpower Profile</CardTitle>
             </CardHeader>
@@ -393,7 +393,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">3. Personal Information</CardTitle>
             </CardHeader>
@@ -501,7 +501,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">4. Learner/Trainee/Student Classification</CardTitle>
             </CardHeader>
@@ -521,7 +521,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">5. Type of Disability (for Persons with Disability only)</CardTitle>
               <CardDescription>To be filled up by TESDA personnel.</CardDescription>
@@ -542,7 +542,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">6. Causes of Disability (for Persons with Disability only)</CardTitle>
               <CardDescription>To be filled up by TESDA personnel.</CardDescription>
@@ -557,7 +557,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">7. Name of Course/Qualification</CardTitle>
             </CardHeader>
@@ -566,7 +566,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">8. If Scholar, Type of Scholarship Package (TWSP, PESFA, STEP, others)</CardTitle>
             </CardHeader>
@@ -575,7 +575,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">9. Privacy Disclaimer</CardTitle>
             </CardHeader>
@@ -597,7 +597,7 @@ export default function AdmissionPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">10. Applicant&apos;s Signature</CardTitle>
             </CardHeader>
@@ -631,7 +631,7 @@ export default function AdmissionPage() {
           </Card>
 
           <div className="flex items-center gap-3">
-            <Button type="submit" className="bg-blue-700 hover:bg-blue-800" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -648,15 +648,26 @@ export default function AdmissionPage() {
         </form>
 
         <Dialog open={submittedModalOpen} onOpenChange={setSubmittedModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Form Submitted</DialogTitle>
-              <DialogDescription>
-                Thank you for registration. Please wait for admin approval on your email.
+          <DialogContent className="sm:max-w-md border-blue-100">
+            <DialogHeader className="text-left space-y-3">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                <CheckCircle2 className="h-7 w-7" />
+              </div>
+              <DialogTitle className="text-2xl text-blue-950">Registration Submitted</DialogTitle>
+              <DialogDescription className="text-slate-600 text-base leading-relaxed">
+                Thank you for registering. Please wait for admin approval on your email.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => setSubmittedModalOpen(false)}>OK</Button>
+            <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm text-blue-900">
+              We will send your login credentials after approval.
+            </div>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button variant="outline" onClick={() => setSubmittedModalOpen(false)}>
+                Close
+              </Button>
+              <Link href="/">
+                <Button>Back to Home</Button>
+              </Link>
             </DialogFooter>
           </DialogContent>
         </Dialog>

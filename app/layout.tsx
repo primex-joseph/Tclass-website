@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Source_Serif_4 } from "next/font/google";
+import { Manrope, Sora } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta-sans",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
-const sourceSerif = Source_Serif_4({
-  variable: "--font-source-serif",
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
 });
 
@@ -23,12 +24,29 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeInitializer = `
+    (function () {
+      try {
+        var key = "tclass_theme";
+        var saved = localStorage.getItem(key);
+        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var isDark = saved ? saved === "dark" : prefersDark;
+        if (isDark) document.documentElement.classList.add("dark");
+      } catch (e) {}
+    })();
+  `;
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
+      </head>
       <body
-        className={`${plusJakartaSans.variable} ${sourceSerif.variable} antialiased`}
+        suppressHydrationWarning
+        className={`${manrope.variable} ${sora.variable} antialiased`}
       >
         {children}
+        <ThemeToggle />
         <ToastProvider />
       </body>
     </html>

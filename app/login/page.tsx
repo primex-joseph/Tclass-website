@@ -90,10 +90,10 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100 dark:from-blue-950 dark:via-slate-950 dark:to-blue-900 flex items-center justify-center p-4">
       <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8">
-        <div className="hidden lg:flex flex-col justify-center text-white">
-          <Link href="/" className="inline-flex items-center text-blue-200 hover:text-white mb-8 transition-colors">
+        <div className="hidden lg:flex flex-col justify-center text-slate-900 dark:text-white">
+          <Link href="/" className="inline-flex items-center text-blue-700 dark:text-blue-200 hover:text-blue-900 dark:hover:text-white mb-8 transition-colors">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
           </Link>
           <div className="flex items-center gap-4 mb-6">
@@ -102,17 +102,17 @@ function LoginPageContent() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">PGT - TCLASS</h1>
-              <p className="text-blue-200">Tarlac Center for Learning And Skills Success</p>
+              <p className="text-blue-700 dark:text-blue-200">Tarlac Center for Learning And Skills Success</p>
             </div>
           </div>
-          <h2 className="text-4xl font-bold mb-6 leading-tight">Welcome to <span className="text-yellow-400">TCLASS Portal</span></h2>
-          <p className="text-blue-100 text-lg">Sign in with your backend account to continue.</p>
+          <h2 className="text-4xl font-bold mb-6 leading-tight">Welcome to <span className="text-blue-600 dark:text-yellow-400">TCLASS Portal</span></h2>
+          <p className="text-slate-700 dark:text-blue-100 text-lg">Sign in with your backend account to continue.</p>
         </div>
 
-        <Card className="shadow-2xl">
+        <Card className="shadow-2xl bg-white/95 dark:bg-slate-950/85 border-blue-100/80 dark:border-white/10 backdrop-blur-sm">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Sign In</CardTitle>
-            <CardDescription>Choose account type and enter credentials</CardDescription>
+            <CardTitle className="text-2xl text-slate-900 dark:text-white">Sign In</CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-300">Choose account type and enter credentials</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-2 mb-6">
@@ -127,8 +127,8 @@ function LoginPageContent() {
                   onClick={() => setUserType(type.id as UserRole)}
                   className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
                     userType === type.id
-                      ? "border-blue-600 bg-blue-50 text-blue-600"
-                      : "border-slate-200 hover:border-slate-300 text-slate-600"
+                      ? "border-blue-600 bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300"
+                      : "border-slate-200 dark:border-white/15 hover:border-slate-300 dark:hover:border-blue-300/50 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   <type.icon className="h-5 w-5" />
@@ -139,13 +139,13 @@ function LoginPageContent() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email / Username</Label>
+                <Label htmlFor="email" className="text-slate-800 dark:text-slate-100">Email / Username</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <Input
                     id="email"
                     type="text"
-                    className="pl-9"
+                    className="pl-9 bg-white dark:bg-slate-950/85 border-slate-300 dark:border-white/20 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 [color-scheme:light] dark:[color-scheme:dark] autofill:bg-white dark:autofill:bg-slate-950"
                     placeholder="Enter your email or username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -155,13 +155,13 @@ function LoginPageContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-slate-800 dark:text-slate-100">Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    className="pl-9 pr-10"
+                    className="pl-9 pr-10 bg-white dark:bg-slate-950/85 border-slate-300 dark:border-white/20 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 [color-scheme:light] dark:[color-scheme:dark] autofill:bg-white dark:autofill:bg-slate-950"
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -170,7 +170,7 @@ function LoginPageContent() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -190,7 +190,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-teal-700" />}>
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-cyan-100 dark:from-blue-950 dark:via-slate-950 dark:to-blue-900" />}>
       <LoginPageContent />
     </Suspense>
   );

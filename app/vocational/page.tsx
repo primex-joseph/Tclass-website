@@ -187,8 +187,135 @@ const PH_VALID_IDS = [
   "Others",
 ];
 
+const PROGRAM_REQUIREMENTS: Record<
+  string,
+  {
+    qualifications: string[];
+    documentaryRequirements: string[];
+  }
+> = {
+  "Rigid Highway Dump Truck NCII": {
+    qualifications: [
+      "At least High School or SHS Graduate/ALS passer/College level or graduate",
+      "18 years old and above",
+      "Physically and mentally fit",
+      "Can comply with all requirements needed",
+    ],
+    documentaryRequirements: [
+      "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+      "ALS Graduate: ALS Certificate",
+      "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+      "PSA Birth Certificate (photocopy)",
+      "PSA Marriage Certificate (for female married students)",
+      "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+      "Original Barangay Indigency",
+      "Original Medical Certificate",
+      "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+      "Long envelope with clear plastic envelope",
+      "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+    ],
+  },
+  "Transit Mixer NCII": {
+    qualifications: [
+      "At least High School or SHS Graduate/ALS passer/College level or graduate",
+      "18 years old and above",
+      "Physically and mentally fit",
+      "Can comply with all requirements needed",
+    ],
+    documentaryRequirements: [
+      "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+      "ALS Graduate: ALS Certificate",
+      "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+      "PSA Birth Certificate (photocopy)",
+      "PSA Marriage Certificate (for female married students)",
+      "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+      "Original Barangay Indigency",
+      "Original Medical Certificate",
+      "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+      "Long envelope with clear plastic envelope",
+      "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+    ],
+  },
+  "Forklift NCII": {
+    qualifications: [
+      "At least High School or SHS Graduate/ALS passer/College level or graduate",
+      "18 years old and above",
+      "Physically and mentally fit",
+      "Can comply with all requirements needed",
+    ],
+    documentaryRequirements: [
+      "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+      "ALS Graduate: ALS Certificate",
+      "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+      "PSA Birth Certificate (photocopy)",
+      "PSA Marriage Certificate (for female married students)",
+      "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+      "Original Barangay Indigency",
+      "Original Medical Certificate",
+      "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+      "Long envelope with clear plastic envelope",
+      "For driving/heavy equipment: Driver's license (original and photocopy), bring original documents for verification, and must be capable of operating a 4-wheeled vehicle",
+    ],
+  },
+  "3-Year Diploma in ICT": {
+    qualifications: [
+      "18 years old and above",
+      "Graduate of Senior High School / ALS / Old Curriculum",
+      "Must meet interview requirements",
+    ],
+    documentaryRequirements: [
+      "Valid ID / Recent School ID",
+      "PSA Birth Certificate",
+      "SF9 / Report Card",
+      "Certificate of Good Moral Conduct",
+    ],
+  },
+  "Housekeeping NCII": {
+    qualifications: [
+      "At least High School or SHS Graduate/ALS passer/College level or graduate",
+      "18 years old and above",
+      "Physically and mentally fit",
+      "Can comply with all requirements needed",
+    ],
+    documentaryRequirements: [
+      "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+      "ALS Graduate: ALS Certificate",
+      "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+      "PSA Birth Certificate (photocopy)",
+      "PSA Marriage Certificate (for female married students)",
+      "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+      "Original Barangay Indigency",
+      "Original Medical Certificate",
+      "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+      "Long envelope with clear plastic envelope",
+    ],
+  },
+  "Health Care Services NCII": {
+    qualifications: [
+      "At least High School or SHS Graduate/ALS passer/College level or graduate",
+      "18 years old and above",
+      "Physically and mentally fit",
+      "Can comply with all requirements needed",
+    ],
+    documentaryRequirements: [
+      "High School Graduate: Photocopy of Diploma, and Certified True Copy of Form 138/137/Form 9",
+      "ALS Graduate: ALS Certificate",
+      "College Level/Graduate: Photocopy of Diploma, Certified True Copy of Transcript of Records, National Certificates (if applicable)",
+      "PSA Birth Certificate (photocopy)",
+      "PSA Marriage Certificate (for female married students)",
+      "Picture in white background with collar (studio shot): 3 pcs passport size, 4 pcs 1x1",
+      "Original Barangay Indigency",
+      "Original Medical Certificate",
+      "Voter's ID/Certification or any government-issued ID with address (photocopy)",
+      "Long envelope with clear plastic envelope",
+    ],
+  },
+};
+
 function VocationalPageContent() {
   const searchParams = useSearchParams();
+  const selectedProgram = searchParams.get("program") ?? "";
+  const selectedProgramRequirements = selectedProgram ? PROGRAM_REQUIREMENTS[selectedProgram] : null;
   const [form, setForm] = useState<FormState>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [idPictureFile, setIdPictureFile] = useState<File | null>(null);
@@ -230,13 +357,12 @@ function VocationalPageContent() {
   }, [form, validIdType, validIdTypeOther, isDraftReady]);
 
   useEffect(() => {
-    const selectedProgram = searchParams.get("program");
     if (!selectedProgram) return;
     setForm((prev) => ({
       ...prev,
       courseQualificationName: prev.courseQualificationName || selectedProgram,
     }));
-  }, [searchParams]);
+  }, [selectedProgram]);
 
   const toggleArrayValue = (
     key: "civilStatus" | "educationalAttainment" | "learnerClassifications" | "disabilityTypes" | "disabilityCauses",
@@ -321,7 +447,7 @@ function VocationalPageContent() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="glass-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-4">
           <div>
             <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Vocational Enrollment</Badge>
             <h1 className="text-3xl font-semibold text-blue-950">Learner&apos;s Profile Form</h1>
@@ -333,7 +459,34 @@ function VocationalPageContent() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card className="border-blue-100 shadow-sm">
+          {selectedProgramRequirements && (
+            <Card className="elev-card border-blue-100/80 bg-white/90">
+              <CardHeader>
+                <CardTitle className="text-blue-900">Program Requirements: {selectedProgram}</CardTitle>
+                <CardDescription>Please review these before submitting your registration.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-2">Documentary Requirements</h3>
+                  <ul className="space-y-1 text-sm text-slate-700 list-disc pl-5">
+                    {selectedProgramRequirements.documentaryRequirements.map((item, index) => (
+                      <li key={`document-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-2">Qualifications</h3>
+                  <ul className="space-y-1 text-sm text-slate-700 list-disc pl-5">
+                    {selectedProgramRequirements.qualifications.map((item, index) => (
+                      <li key={`qualification-${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">Required Supporting Documents</CardTitle>
               <CardDescription>These are required for Training Programs & Scholarships enrollment.</CardDescription>
@@ -384,7 +537,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">Learner ID Picture</CardTitle>
               <CardDescription>Attach learner ID picture (for profile and verification).</CardDescription>
@@ -400,7 +553,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">1. T2MIS Auto Generated</CardTitle>
             </CardHeader>
@@ -416,7 +569,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">2. Learner/Manpower Profile</CardTitle>
             </CardHeader>
@@ -500,7 +653,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">3. Personal Information</CardTitle>
             </CardHeader>
@@ -608,7 +761,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">4. Learner/Trainee/Student Classification</CardTitle>
             </CardHeader>
@@ -628,7 +781,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">5. Type of Disability (for Persons with Disability only)</CardTitle>
               <CardDescription>To be filled up by TESDA personnel.</CardDescription>
@@ -649,7 +802,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">6. Causes of Disability (for Persons with Disability only)</CardTitle>
               <CardDescription>To be filled up by TESDA personnel.</CardDescription>
@@ -664,7 +817,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">7. Name of Course/Qualification</CardTitle>
             </CardHeader>
@@ -673,7 +826,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">8. If Scholar, Type of Scholarship Package (TWSP, PESFA, STEP, others)</CardTitle>
             </CardHeader>
@@ -682,7 +835,7 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 shadow-sm">
+          <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">9. Privacy Disclaimer</CardTitle>
             </CardHeader>
@@ -738,7 +891,7 @@ function VocationalPageContent() {
           </Card>
 
           <div className="flex items-center gap-3">
-            <Button type="submit" className="bg-blue-700 hover:bg-blue-800" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -774,7 +927,7 @@ function VocationalPageContent() {
                 Close
               </Button>
               <Link href="/">
-                <Button className="bg-blue-700 hover:bg-blue-800">Back to Home</Button>
+                <Button>Back to Home</Button>
               </Link>
             </DialogFooter>
           </DialogContent>
