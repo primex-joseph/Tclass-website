@@ -263,7 +263,7 @@ export default function AdmissionPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
+    <main className="admission-page min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="glass-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-4">
           <div>
@@ -675,3 +675,4 @@ export default function AdmissionPage() {
     </main>
   );
 }
+

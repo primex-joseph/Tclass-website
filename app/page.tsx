@@ -331,9 +331,6 @@ export default function LandingPage() {
               <Link href="/login">
                 <Button variant="outline" size="sm" className="hidden sm:flex dark:border-white/30 dark:bg-white/10 dark:text-white dark:hover:bg-white/20">Login</Button>
               </Link>
-              <Link href="/student">
-                <Button size="sm">Student Portal</Button>
-              </Link>
               <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
@@ -774,3 +771,4 @@ export default function LandingPage() {
     </div>
   );
 }
+

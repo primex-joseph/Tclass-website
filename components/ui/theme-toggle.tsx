@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 const THEME_KEY = "tclass_theme";
 
-export function ThemeToggle() {
+export function ThemeToggle({ className = "" }: { className?: string }) {
   useEffect(() => {
     // Keep root class aligned to persisted/system preference on client.
     const root = document.documentElement;
@@ -32,7 +32,7 @@ export function ThemeToggle() {
       type="button"
       aria-label="Toggle theme"
       onClick={toggleTheme}
-      className="theme-toggle"
+      className={`theme-toggle ${className}`.trim()}
       title="Toggle theme"
     >
       <span className="theme-switch" aria-hidden="true">
@@ -42,7 +42,7 @@ export function ThemeToggle() {
         </span>
         <span className="theme-switch-thumb" />
       </span>
-      <span className="theme-toggle-label">Appearance</span>
     </button>
   );
 }
+
