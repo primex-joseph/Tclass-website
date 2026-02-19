@@ -43,7 +43,7 @@ import {
   GraduationCap, 
   BookOpen, 
   Building2,
-  Bell,
+  MessageSquare,
   Search,
   Menu,
   X,
@@ -64,6 +64,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // Types
 interface UserItem {
@@ -95,11 +96,22 @@ interface Department {
   classes: number;
 }
 
-interface Notification {
+interface ContactMessageItem {
   id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
   message: string;
-  time: string;
-  read: boolean;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+interface ContactMessagesPayload {
+  messages?: ContactMessageItem[];
+  unread_count?: number;
 }
 
 interface AdmissionApplication {
@@ -167,7 +179,9 @@ interface VocationalTrend {
 
 const formatJoinedTime = (dateText?: string) => {
   if (!dateText) return "just now";
-  const ms = Date.now() - new Date(dateText).getTime();
+  const ts = parseTimestamp(dateText);
+  if (ts === null) return "just now";
+  const ms = Date.now() - ts;
   if (Number.isNaN(ms) || ms < 0) return "just now";
   const mins = Math.floor(ms / 60000);
   if (mins < 1) return "just now";
@@ -176,6 +190,60 @@ const formatJoinedTime = (dateText?: string) => {
   if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`;
   const days = Math.floor(hrs / 24);
   return `${days} day${days > 1 ? "s" : ""} ago`;
+};
+
+const parseTimestamp = (dateText?: string): number | null => {
+  if (!dateText) return null;
+  const raw = dateText.trim();
+  if (!raw) return null;
+
+  let normalized = raw;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+    // Laravel DB datetime strings often have no timezone. Treat as UTC.
+    normalized = `${raw.replace(" ", "T")}Z`;
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+    normalized = `${raw}Z`;
+  }
+
+  const parsed = Date.parse(normalized);
+  if (!Number.isNaN(parsed)) return parsed;
+
+  const fallback = Date.parse(raw.replace(" ", "T"));
+  if (!Number.isNaN(fallback)) return fallback;
+
+  return null;
+};
+
+const formatRelativeTime = (dateText?: string) => {
+  if (!dateText) return "just now";
+  const ts = parseTimestamp(dateText);
+  if (ts === null) return "just now";
+  const ms = Date.now() - ts;
+  if (Number.isNaN(ms) || ms < 0) return "just now";
+  const mins = Math.floor(ms / 60000);
+  const exact = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+    .format(ts)
+    .replace(/\s/g, "")
+    .toLowerCase();
+  const exactDate = new Intl.DateTimeFormat("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  })
+    .format(ts)
+    .replace(/\//g, "-");
+  const exactStamp = `${exact} - ${exactDate}`;
+
+  if (mins < 1) return `just now - ${exactStamp}`;
+  if (mins < 60) return `${mins} min${mins > 1 ? "s" : ""} ago - ${exactStamp}`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago - ${exactStamp}`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? "s" : ""} ago - ${exactStamp}`;
 };
 
 const normalizeRole = (role?: string): UserItem["role"] => {
@@ -247,12 +315,12 @@ export default function AdminDashboard() {
     { id: 4, name: "History", head: "Prof. Garcia", faculty: 5, students: 200, classes: 15 },
   ]);
   
-  const [notifications, setNotifications] = useState<Notification[]>([
-    { id: 1, message: "New user registration: Maria Santos", time: "2 mins ago", read: false },
-    { id: 2, message: "Pending approval: Pedro Martinez", time: "30 mins ago", read: false },
-    { id: 3, message: "System backup completed", time: "1 hour ago", read: true },
-  ]);
-  
+  const [contactMessages, setContactMessages] = useState<ContactMessageItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [allMessagesOpen, setAllMessagesOpen] = useState(false);
+  const [activeMessagePreview, setActiveMessagePreview] = useState<ContactMessageItem | null>(null);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
@@ -417,6 +485,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadContactMessages = async (silent = false, limit = 20) => {
+    if (!silent) {
+      setLoadingMessages(true);
+    }
+    try {
+      const response = await apiFetch(`/admin/contact-messages?limit=${limit}`);
+      const payload = response as ContactMessagesPayload;
+      const rows = payload.messages ?? [];
+      setContactMessages(rows);
+      setUnreadCount(Number(payload.unread_count ?? rows.filter((row) => !row.is_read).length));
+    } catch (error) {
+      if (!silent) {
+        toast.error(error instanceof Error ? error.message : "Failed to load contact messages.");
+      }
+    } finally {
+      if (!silent) {
+        setLoadingMessages(false);
+      }
+    }
+  };
+
   useEffect(() => {
     let alive = true;
     apiFetch("/admin/admissions")
@@ -455,6 +544,43 @@ export default function AdminDashboard() {
 
     return () => {
       alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    const fetchMessages = async (silent = false) => {
+      if (!silent) {
+        setLoadingMessages(true);
+      }
+      try {
+        const response = await apiFetch("/admin/contact-messages?limit=20");
+        if (!alive) return;
+        const payload = response as ContactMessagesPayload;
+        const rows = payload.messages ?? [];
+        setContactMessages(rows);
+        setUnreadCount(Number(payload.unread_count ?? rows.filter((row) => !row.is_read).length));
+      } catch (error) {
+        if (!alive) return;
+        if (!silent) {
+          toast.error(error instanceof Error ? error.message : "Failed to load contact messages.");
+        }
+      } finally {
+        if (alive && !silent) {
+          setLoadingMessages(false);
+        }
+      }
+    };
+
+    fetchMessages(false);
+    const timer = window.setInterval(() => {
+      fetchMessages(true);
+    }, 30000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -553,11 +679,65 @@ export default function AdminDashboard() {
     toast.success(`Department "${dept.name}" added successfully`);
   };
 
-  const handleClearNotifications = () => {
-    setNotifications([]);
-    setShowNotifications(false);
-    toast.success("All notifications cleared");
+  const handleClearNotifications = async () => {
+    try {
+      await apiFetch("/admin/contact-messages/read-all", { method: "PATCH" });
+      setContactMessages((rows) => rows.map((row) => ({ ...row, is_read: true, read_at: row.read_at ?? new Date().toISOString() })));
+      setUnreadCount(0);
+      setActiveMessagePreview((current) =>
+        current ? { ...current, is_read: true, read_at: current.read_at ?? new Date().toISOString() } : current
+      );
+      toast.success("All messages marked as read.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to mark messages as read.");
+    }
   };
+
+  const handleOpenMessage = async (messageId: number) => {
+    const message = contactMessages.find((item) => item.id === messageId);
+    if (!message) {
+      return;
+    }
+
+    void loadContactMessages(true, 100);
+    setActiveMessagePreview(message);
+    setShowNotifications(false);
+    setAllMessagesOpen(false);
+
+    if (message.is_read) {
+      return;
+    }
+
+    try {
+      await apiFetch(`/admin/contact-messages/${messageId}/read`, { method: "PATCH" });
+      setContactMessages((rows) =>
+        rows.map((row) =>
+          row.id === messageId
+            ? { ...row, is_read: true, read_at: row.read_at ?? new Date().toISOString() }
+            : row
+        )
+      );
+      setUnreadCount((count) => Math.max(0, count - 1));
+      setActiveMessagePreview((current) => {
+        if (!current || current.id !== messageId) return current;
+        return { ...current, is_read: true, read_at: current.read_at ?? new Date().toISOString() };
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update message status.");
+    }
+  };
+
+  const sortedMessages = [...contactMessages].sort((a, b) => {
+    const aTs = parseTimestamp(a.created_at) ?? 0;
+    const bTs = parseTimestamp(b.created_at) ?? 0;
+    return bTs - aTs;
+  });
+  const activeSenderMessages = activeMessagePreview
+    ? sortedMessages.filter(
+        (msg) => msg.email.toLowerCase() === activeMessagePreview.email.toLowerCase()
+      )
+    : [];
+  const latestMessages = sortedMessages.slice(0, 3);
 
   const handleNavClick = (section: string) => {
     toast(`Navigating to ${section}...`, { icon: "🔗" });
@@ -579,7 +759,6 @@ export default function AdminDashboard() {
     setDeleteConfirmOpen(true);
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
   const pendingAdmissions = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "admission");
   const pendingVocationals = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "vocational");
 
@@ -698,34 +877,75 @@ export default function AdminDashboard() {
                   variant="ghost" 
                   size="icon" 
                   className="relative"
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={async () => {
+                    const next = !showNotifications;
+                    setShowNotifications(next);
+                    if (next) {
+                      await loadContactMessages(true);
+                    }
+                  }}
                 >
-                  <Bell className="h-5 w-5" />
+                  <MessageSquare className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                    <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-[11px] font-semibold text-white flex items-center justify-center">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   )}
                 </Button>
                 
                 {/* Notifications Dropdown */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
-                    <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-                      <h3 className="font-semibold text-slate-900">Notifications</h3>
-                      <Button variant="ghost" size="sm" onClick={handleClearNotifications}>
-                        Clear all
+                  <div className="absolute right-0 mt-2 w-80 rounded-lg border border-slate-200 bg-neutral-50 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-950">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Inbox Messages</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">Latest 3 messages</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+                        onClick={handleClearNotifications}
+                      >
+                        Mark all read
                       </Button>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <p className="p-4 text-center text-slate-500">No notifications</p>
+                      {loadingMessages ? (
+                        <p className="p-4 text-center text-slate-600 dark:text-slate-300">Loading messages...</p>
+                      ) : latestMessages.length === 0 ? (
+                        <p className="p-4 text-center text-slate-600 dark:text-slate-300">No messages yet.</p>
                       ) : (
-                        notifications.map((notif) => (
-                          <div key={notif.id} className={`p-3 border-b border-slate-100 hover:bg-slate-50 ${!notif.read ? 'bg-blue-50' : ''}`}>
-                            <p className="text-sm text-slate-700">{notif.message}</p>
-                            <p className="text-xs text-slate-500 mt-1">{notif.time}</p>
-                          </div>
+                        latestMessages.map((msg) => (
+                          <button
+                            key={msg.id}
+                            type="button"
+                            onClick={() => handleOpenMessage(msg.id)}
+                            className={`w-full text-left p-3 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors ${
+                              !msg.is_read ? "bg-blue-50 dark:bg-blue-950/45" : "bg-transparent"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{msg.full_name}</p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300 truncate">{msg.email}</p>
+                            <p className="text-sm text-slate-700 dark:text-slate-200 truncate mt-1">{msg.message}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{formatRelativeTime(msg.created_at)}</p>
+                          </button>
                         ))
                       )}
+                    </div>
+                    <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-100/60 dark:bg-slate-900/60 rounded-b-lg">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-slate-300 dark:border-slate-700"
+                        onClick={async () => {
+                          await loadContactMessages(false, 100);
+                          setAllMessagesOpen(true);
+                          setShowNotifications(false);
+                        }}
+                      >
+                        View all messages
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -739,6 +959,7 @@ export default function AdminDashboard() {
                   <p className="text-sm font-medium text-slate-900">Admin User</p>
                   <p className="text-xs text-slate-500">Super Admin</p>
                 </div>
+                <ThemeToggle className="theme-toggle-inline" />
                 <Button variant="outline" size="sm" onClick={handleLogout} className="ml-1">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
@@ -1265,6 +1486,60 @@ export default function AdminDashboard() {
         </div>
       </main>
 
+      {activeMessagePreview && (
+        <div className="fixed bottom-4 right-4 z-[70] w-[24rem] max-w-[calc(100vw-1rem)] rounded-xl border border-slate-300 bg-white/98 shadow-2xl dark:border-slate-700 dark:bg-slate-950/98">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                {activeMessagePreview.full_name}
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 truncate">
+                {activeMessagePreview.email}
+              </p>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
+                {formatRelativeTime(activeMessagePreview.created_at)}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onClick={() => setActiveMessagePreview(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="max-h-52 overflow-y-auto px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+            <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+              {activeMessagePreview.message}
+            </p>
+          </div>
+          {activeSenderMessages.length > 1 && (
+            <div className="px-3 py-2">
+              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                More from this sender
+              </p>
+              <div className="max-h-36 overflow-y-auto space-y-1">
+                {activeSenderMessages
+                  .filter((msg) => msg.id !== activeMessagePreview.id)
+                  .map((msg) => (
+                    <button
+                      key={msg.id}
+                      type="button"
+                      onClick={() => setActiveMessagePreview(msg)}
+                      className="w-full rounded-md border border-slate-200 px-2 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-900"
+                    >
+                      <p className="text-xs text-slate-600 dark:text-slate-400">{formatRelativeTime(msg.created_at)}</p>
+                      <p className="text-sm text-slate-800 dark:text-slate-200 truncate mt-1">{msg.message}</p>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Edit User Dialog */}
       <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
         <DialogContent>
@@ -1330,6 +1605,51 @@ export default function AdminDashboard() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancel</Button>
             <Button onClick={handleEditUser}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={allMessagesOpen} onOpenChange={setAllMessagesOpen}>
+        <DialogContent className="sm:max-w-2xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">All Inbox Messages</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Latest messages sent from the landing page contact form.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+            {loadingMessages ? (
+              <p className="p-4 text-center text-slate-600 dark:text-slate-300">Loading messages...</p>
+            ) : sortedMessages.length === 0 ? (
+              <p className="p-4 text-center text-slate-600 dark:text-slate-300">No messages yet.</p>
+            ) : (
+              sortedMessages.map((msg) => (
+                <button
+                  key={msg.id}
+                  type="button"
+                  onClick={() => handleOpenMessage(msg.id)}
+                  className={`w-full text-left p-3 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 ${
+                    !msg.is_read ? "bg-blue-50 dark:bg-blue-950/45" : "bg-transparent"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{msg.full_name}</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 truncate">{msg.email}</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-200 mt-1">{msg.message}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{formatRelativeTime(msg.created_at)}</p>
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClearNotifications}>
+              Mark all read
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setAllMessagesOpen(false)}
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

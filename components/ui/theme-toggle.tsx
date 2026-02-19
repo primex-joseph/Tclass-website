@@ -2,10 +2,13 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const THEME_KEY = "tclass_theme";
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
+  const pathname = usePathname();
+
   useEffect(() => {
     // Keep root class aligned to persisted/system preference on client.
     const root = document.documentElement;
@@ -26,6 +29,12 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 
     window.setTimeout(() => root.classList.remove("theme-transition"), 380);
   };
+
+  const isInline = className.includes("theme-toggle-inline");
+  const isAdminRoute = pathname.startsWith("/admin");
+  if (!isInline && isAdminRoute) {
+    return null;
+  }
 
   return (
     <button
