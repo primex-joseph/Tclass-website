@@ -11,6 +11,8 @@ type AdmissionSubmitInput = {
   validIdType?: string | null;
   facebookAccount?: string | null;
   contactNo?: string | null;
+  enrollmentPurposes?: string[];
+  enrollmentPurposeOthers?: string | null;
   formData: Record<string, unknown>;
   idPictureFile?: File | null;
   oneByOnePictureFile?: File | null;
@@ -37,6 +39,12 @@ export async function submitAdmissionForm(input: AdmissionSubmitInput) {
   body.append("valid_id_type", input.validIdType ?? "");
   body.append("facebook_account", input.facebookAccount ?? "");
   body.append("contact_no", input.contactNo ?? "");
+  if (input.enrollmentPurposes?.length) {
+    input.enrollmentPurposes.forEach((purpose) => {
+      body.append("enrollment_purposes[]", purpose);
+    });
+  }
+  body.append("enrollment_purpose_others", input.enrollmentPurposeOthers ?? "");
   body.append("form_data", JSON.stringify(input.formData));
 
   if (input.idPictureFile) body.append("id_picture", input.idPictureFile);

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Manrope, Sora } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast-provider";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -46,7 +45,6 @@ export default function RootLayout({
         className={`${manrope.variable} ${sora.variable} antialiased`}
       >
         {children}
-        <ThemeToggle />
         <ToastProvider />
       </body>
     </html>

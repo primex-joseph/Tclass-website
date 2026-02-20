@@ -77,6 +77,13 @@ const educationalAttainments = [
   "Junior High Graduate",
   "Senior High Graduate",
 ];
+const enrollmentPurposes = [
+  "Employment (Local)",
+  "Employment (Overseas)",
+  "Entrepreneurship (Establishment of business)",
+  "Entrepreneurship (Enhancement of business)",
+  "Others",
+];
 
 type FormState = {
   uliNumber: string;
@@ -117,6 +124,8 @@ type FormState = {
   disabilityCauses: string[];
   courseQualificationName: string;
   scholarshipType: string;
+  enrollmentPurposes: string[];
+  enrollmentPurposeOthers: string;
   privacyConsent: "agree" | "disagree" | "";
   applicantSignature: string;
   dateAccomplished: string;
@@ -163,6 +172,8 @@ const defaultForm: FormState = {
   disabilityCauses: [],
   courseQualificationName: "",
   scholarshipType: "",
+  enrollmentPurposes: [],
+  enrollmentPurposeOthers: "",
   privacyConsent: "",
   applicantSignature: "",
   dateAccomplished: "",
@@ -365,7 +376,13 @@ function VocationalPageContent() {
   }, [selectedProgram]);
 
   const toggleArrayValue = (
-    key: "civilStatus" | "educationalAttainment" | "learnerClassifications" | "disabilityTypes" | "disabilityCauses",
+    key:
+      | "civilStatus"
+      | "educationalAttainment"
+      | "learnerClassifications"
+      | "disabilityTypes"
+      | "disabilityCauses"
+      | "enrollmentPurposes",
     value: string
   ) => {
     setForm((prev) => ({
@@ -398,6 +415,14 @@ function VocationalPageContent() {
       toast.error("Valid ID upload is required.");
       return;
     }
+    if (form.enrollmentPurposes.length === 0) {
+      toast.error("Please select at least one purpose/intention for enrolling.");
+      return;
+    }
+    if (form.enrollmentPurposes.includes("Others") && !form.enrollmentPurposeOthers.trim()) {
+      toast.error("Please specify the purpose under Others.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -416,6 +441,8 @@ function VocationalPageContent() {
         validIdType: validIdType === "Others" ? `Others - ${validIdTypeOther.trim()}` : validIdType,
         facebookAccount: form.facebookAccount || null,
         contactNo: form.contactNo || null,
+        enrollmentPurposes: form.enrollmentPurposes,
+        enrollmentPurposeOthers: form.enrollmentPurposeOthers || null,
         formData: form,
         idPictureFile,
         oneByOnePictureFile,
@@ -886,6 +913,41 @@ function VocationalPageContent() {
                     {rightThumbmarkFile ? `Selected: ${rightThumbmarkFile.name}` : "No file selected."}
                   </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="elev-card border-blue-100/80 bg-white/90">
+            <CardHeader>
+              <CardTitle className="text-blue-900">11. Purpose/s and/or Intention for Enrolling</CardTitle>
+              <CardDescription>Please check the appropriate box below.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid md:grid-cols-2 gap-2">
+                {enrollmentPurposes.map((item) => (
+                  <label key={item} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.enrollmentPurposes.includes(item)}
+                      onChange={() => {
+                        toggleArrayValue("enrollmentPurposes", item);
+                        if (item === "Others" && form.enrollmentPurposes.includes("Others")) {
+                          setForm((prev) => ({ ...prev, enrollmentPurposeOthers: "" }));
+                        }
+                      }}
+                    />
+                    {item}
+                  </label>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Others, please specify</Label>
+                <Input
+                  value={form.enrollmentPurposeOthers}
+                  onChange={(e) => setForm((prev) => ({ ...prev, enrollmentPurposeOthers: e.target.value }))}
+                  disabled={!form.enrollmentPurposes.includes("Others")}
+                  placeholder="Type your specific intention"
+                />
               </div>
             </CardContent>
           </Card>

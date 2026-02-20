@@ -24,9 +24,9 @@ export default function StudentLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <div className={`${geistSans.variable} ${geistMono.variable} student-page min-h-screen antialiased`}>
       <StudentTopNav />
-      <div className="pt-16">{children}</div>
+      <div className="pt-16 pb-24 md:pb-0">{children}</div>
     </div>
   );
 }

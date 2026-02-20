@@ -1,15 +1,19 @@
 # TClass Local Setup Guide
 
-This folder contains step-by-step setup docs for both projects:
+This frontend repo includes:
 
-- `docs/backend-setup.md`
 - `docs/frontend-setup.md`
 
-If you want the fastest path, follow this order:
+Backend setup docs are in the backend repo:
 
-1. Set up backend first (`docs/backend-setup.md`)
-2. Set up frontend second (`docs/frontend-setup.md`)
-3. Open `http://localhost:3000` and test the flows
+- `C:\xampp\htdocs\tclass-v1-backend\docs\backend-setup.md`
+- `C:\xampp\htdocs\tclass-v1-backend\docs\BACKEND_FRESH_START.md`
+
+Fastest path:
+
+1. Setup backend first
+2. Setup frontend second
+3. Open `http://localhost:3000` and test end-to-end flows
 
 Recommended local ports:
 

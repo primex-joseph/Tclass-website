@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Calendar, CheckCircle, Clock, FileText, GraduationCap, MessageSquare, Bell, Search, Menu, X, Upload, BookMarked, Trash2, Eye, ArrowLeft, Truck, Construction, Home, Heart, Laptop } from "lucide-react";
+import { BookOpen, Calendar, CheckCircle, Clock, FileText, GraduationCap, MessageSquare, Bell, Search, Upload, BookMarked, Trash2, Eye, ArrowLeft, Truck, Construction, Home, Heart, Laptop } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -47,8 +47,20 @@ interface Submission {
   grade?: string;
 }
 
+interface AuthMeResponse {
+  user?: {
+    name?: string;
+  };
+}
+
+const extractFirstName = (fullName?: string) => {
+  if (!fullName) return "Student";
+  const trimmed = fullName.trim();
+  if (!trimmed) return "Student";
+  return trimmed.split(/\s+/)[0] ?? "Student";
+};
+
 export default function StudentLandingPage() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationCount, setNotificationCount] = useState(3);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
@@ -60,6 +72,7 @@ export default function StudentLandingPage() {
   const [forcePasswordModalOpen, setForcePasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [studentFirstName, setStudentFirstName] = useState("Student");
 
   const [courses, setCourses] = useState<Course[]>([
     { id: 1, name: "Rigid Highway Dump Truck NCII", instructor: "Engr. Dela Cruz", schedule: "Mon/Wed/Fri 8:00 AM", progress: 75 },
@@ -86,6 +99,17 @@ export default function StudentLandingPage() {
   ]);
 
   const [messages, setMessages] = useState<{id: number, recipient: string, subject: string, sentAt: string}[]>([]);
+
+  useEffect(() => {
+    apiFetch("/auth/me")
+      .then((res) => {
+        const name = (res as AuthMeResponse).user?.name;
+        setStudentFirstName(extractFirstName(name));
+      })
+      .catch(() => {
+        setStudentFirstName("Student");
+      });
+  }, []);
 
   useEffect(() => {
     apiFetch("/student/profile/password-reminder")
@@ -238,7 +262,7 @@ export default function StudentLandingPage() {
 
   return (
     <div className="student-page min-h-screen bg-slate-50">    {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8">
         <Dialog open={forcePasswordModalOpen} onOpenChange={setForcePasswordModalOpen}>
           <DialogContent>
             <DialogHeader>
@@ -295,9 +319,9 @@ export default function StudentLandingPage() {
         </Dialog>
 
         {/* Welcome Section */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Welcome back, Juan!</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome back, {studentFirstName}!</h1>
             <p className="text-slate-600 mt-1">Here&apos;s what&apos;s happening with your studies today.</p>
             {mustChangePassword && (
               <p className="text-sm text-amber-700 mt-2 font-medium">
@@ -308,76 +332,76 @@ export default function StudentLandingPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-blue-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Enrolled Courses</p>
-                  <p className="text-2xl font-bold text-slate-900">{courses.length}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Courses</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{courses.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-100 rounded-lg">
-                  <FileText className="h-6 w-6 text-amber-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Pending Tasks</p>
-                  <p className="text-2xl font-bold text-slate-900">{pendingCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Completed</p>
-                  <p className="text-2xl font-bold text-slate-900">{completedCount}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Pending</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{pendingCount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Clock className="h-6 w-6 text-purple-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Submissions</p>
-                  <p className="text-2xl font-bold text-slate-900">{submissions.length}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Completed</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{completedCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Submissions</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{submissions.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* My Courses */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle>My Courses</CardTitle>
                     <CardDescription>Your enrolled courses this semester</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => handleViewAll("courses")}>View All</Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => handleViewAll("courses")}>View All</Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {(searchQuery ? filteredCourses : courses).map((course) => {
                     const getCourseIcon = (courseName: string) => {
                       if (courseName.includes("Dump Truck") || courseName.includes("Transit Mixer") || courseName.includes("Forklift")) {
@@ -398,8 +422,8 @@ export default function StudentLandingPage() {
                       return "bg-blue-100";
                     };
                     return (
-                      <div key={course.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => toast.success(`Opening ${course.name} - Course Details`)}>
-                        <div className="flex items-center gap-4">
+                      <div key={course.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer sm:flex-row sm:items-center sm:justify-between" onClick={() => toast.success(`Opening ${course.name} - Course Details`)}>
+                        <div className="flex items-center gap-3 sm:gap-4">
                           <div className={`h-12 w-12 ${getCourseBg(course.name)} rounded-lg flex items-center justify-center`}>
                             {getCourseIcon(course.name)}
                           </div>
@@ -408,9 +432,9 @@ export default function StudentLandingPage() {
                             <p className="text-sm text-slate-600">{course.instructor} • {course.schedule}</p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="w-full sm:w-auto text-left sm:text-right">
                           <p className="text-sm font-medium text-slate-900">{course.progress}%</p>
-                          <div className="w-24 h-2 bg-slate-200 rounded-full mt-1">
+                          <div className="h-2 w-full sm:w-24 bg-slate-200 rounded-full mt-1">
                             <div className="h-full bg-blue-600 rounded-full" style={{ width: `${course.progress}%` }}></div>
                           </div>
                         </div>
@@ -427,18 +451,18 @@ export default function StudentLandingPage() {
             {/* Assignments */}
             <Card className="mt-6">
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle>Recent Assignments</CardTitle>
                     <CardDescription>Track your upcoming deadlines</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => handleViewAll("assignments")}>View All</Button>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => handleViewAll("assignments")}>View All</Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {(searchQuery ? filteredAssignments : assignments).map((assignment) => (
-                    <div key={assignment.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div key={assignment.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${assignment.status === 'completed' ? 'bg-green-100' : assignment.status === 'submitted' ? 'bg-blue-100' : 'bg-amber-100'}`}>
                           <FileText className={`h-5 w-5 ${assignment.status === 'completed' ? 'text-green-600' : assignment.status === 'submitted' ? 'text-blue-600' : 'text-amber-600'}`} />
@@ -448,11 +472,11 @@ export default function StudentLandingPage() {
                           <p className="text-sm text-slate-600">{assignment.subject}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         <Badge variant={assignment.status === 'completed' ? 'default' : assignment.status === 'submitted' ? 'secondary' : 'outline'}>
                           {assignment.status === 'completed' ? 'Completed' : assignment.status === 'submitted' ? 'Submitted' : assignment.due}
                         </Badge>
-                        <Button variant="ghost" size="sm" onClick={() => toggleAssignmentStatus(assignment.id)}>
+                        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => toggleAssignmentStatus(assignment.id)}>
                           {assignment.status === 'completed' ? 'Mark Pending' : 'Mark Done'}
                         </Button>
                       </div>
@@ -468,7 +492,7 @@ export default function StudentLandingPage() {
             {/* Recent Submissions */}
             <Card className="mt-6">
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <CardTitle>Recent Submissions</CardTitle>
                     <CardDescription>Your submitted work and grades</CardDescription>
@@ -478,7 +502,7 @@ export default function StudentLandingPage() {
               <CardContent>
                 <div className="space-y-3">
                   {submissions.map((submission) => (
-                    <div key={submission.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div key={submission.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${submission.status === 'graded' ? 'bg-green-100' : 'bg-amber-100'}`}>
                           <Upload className={`h-5 w-5 ${submission.status === 'graded' ? 'text-green-600' : 'text-amber-600'}`} />
@@ -488,7 +512,7 @@ export default function StudentLandingPage() {
                           <p className="text-sm text-slate-600">{submission.subject} • {submission.submittedAt}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         {submission.grade && (
                           <Badge variant="default" className="text-lg">{submission.grade}</Badge>
                         )}
@@ -507,7 +531,7 @@ export default function StudentLandingPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Announcements */}
             <Card>
               <CardHeader>
@@ -517,12 +541,12 @@ export default function StudentLandingPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {announcements.map((announcement) => (
                     <div key={announcement.id} className="pb-4 border-b border-slate-100 last:border-0 last:pb-0 group">
                       <div className="flex justify-between items-start">
                         <Badge variant="outline" className="mb-2">{announcement.type}</Badge>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteAnnouncement(announcement.id)}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onClick={() => deleteAnnouncement(announcement.id)}>
                           <Trash2 className="h-3 w-3 text-slate-400" />
                         </Button>
                       </div>

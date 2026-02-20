@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,12 +60,12 @@ import {
   Loader2,
   LogOut
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type UIEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 
 // Types
 interface UserItem {
@@ -290,8 +291,10 @@ const extractUserRows = (payload: unknown): BackendUserItem[] => {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [userRoleFilter, setUserRoleFilter] = useState<"student" | "faculty" | "admin">("student");
+  const [userRoleFilter, setUserRoleFilter] = useState<"student" | "faculty" | "admin">("admin");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [universalSearchQuery, setUniversalSearchQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   
   // Dialog states
@@ -319,6 +322,8 @@ export default function AdminDashboard() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [allMessagesOpen, setAllMessagesOpen] = useState(false);
+  const [viewAllAccountsOpen, setViewAllAccountsOpen] = useState(false);
+  const [visibleAccountsCount, setVisibleAccountsCount] = useState(5);
   const [activeMessagePreview, setActiveMessagePreview] = useState<ContactMessageItem | null>(null);
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -639,6 +644,13 @@ export default function AdminDashboard() {
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const visibleUsers = filteredUsers.slice(0, visibleAccountsCount);
+  const hasMoreUsers = visibleAccountsCount < filteredUsers.length;
+
+  useEffect(() => {
+    if (!viewAllAccountsOpen) return;
+    setVisibleAccountsCount(5);
+  }, [viewAllAccountsOpen, userRoleFilter, searchQuery]);
 
   // Handlers
   const handleEditUser = () => {
@@ -657,6 +669,15 @@ export default function AdminDashboard() {
     setDeleteConfirmOpen(false);
     toast.success(`User "${selectedUser.name}" deleted successfully`);
     setSelectedUser(null);
+  };
+
+  const handleViewAllUsersScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (loadingUsers || !hasMoreUsers) return;
+    const container = event.currentTarget;
+    const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 24;
+    if (!nearBottom) return;
+
+    setVisibleAccountsCount((current) => Math.min(current + 5, filteredUsers.length));
   };
 
   const handleAddDepartment = () => {
@@ -742,6 +763,11 @@ export default function AdminDashboard() {
   const handleNavClick = (section: string) => {
     toast(`Navigating to ${section}...`, { icon: "🔗" });
   };
+  const setAdminTabFromMobile = (tab: "users" | "departments" | "admissions" | "vocationals") => {
+    setActiveAdminTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   const handleLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
@@ -761,6 +787,104 @@ export default function AdminDashboard() {
 
   const pendingAdmissions = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "admission");
   const pendingVocationals = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "vocational");
+  const universalTerm = universalSearchQuery.trim().toLowerCase();
+  const matchedUsers = universalTerm
+    ? users
+        .filter(
+          (user) =>
+            user.name.toLowerCase().includes(universalTerm) ||
+            user.email.toLowerCase().includes(universalTerm) ||
+            user.role.toLowerCase().includes(universalTerm)
+        )
+    : [];
+  const matchedDepartments = universalTerm
+    ? departments
+        .filter(
+          (department) =>
+            department.name.toLowerCase().includes(universalTerm) ||
+            department.head.toLowerCase().includes(universalTerm)
+        )
+    : [];
+  const matchedAdmissions = universalTerm
+    ? admissions
+        .filter((item) =>
+          [
+            item.full_name,
+            item.email,
+            item.primary_course,
+            item.secondary_course ?? "",
+            item.application_type ?? "admission",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(universalTerm)
+        )
+    : [];
+  const matchedCourseTrends = universalTerm
+    ? courseTrends
+        .filter((trend) => trend.course.toLowerCase().includes(universalTerm))
+    : [];
+  const matchedVocationalTrends = universalTerm
+    ? vocationalTrends
+        .filter((trend) => trend.program.toLowerCase().includes(universalTerm))
+    : [];
+  const totalUniversalMatches =
+    matchedUsers.length +
+    matchedDepartments.length +
+    matchedAdmissions.length +
+    matchedCourseTrends.length +
+    matchedVocationalTrends.length;
+
+  const openUserFromUniversalSearch = (user: UserItem) => {
+    const roleFilter: "student" | "faculty" | "admin" =
+      user.role === "Faculty" ? "faculty" : user.role === "Admin" ? "admin" : "student";
+    setUserRoleFilter(roleFilter);
+    setActiveAdminTab("users");
+    setSearchQuery(user.name);
+    setMobileSearchOpen(false);
+  };
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1280) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) {
+      setUniversalSearchQuery("");
+    }
+  }, [mobileSearchOpen]);
 
   const handleApproveAdmission = async (id: number) => {
     setApprovingAdmissionId(id);
@@ -822,25 +946,25 @@ export default function AdminDashboard() {
   return (
     <div className="admin-page min-h-screen bg-slate-50 dark:bg-transparent">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-[92rem] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-18 py-2">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-[0_8px_20px_rgba(15,23,42,0.05)] backdrop-blur-md dark:border-white/12 dark:bg-slate-950/95 dark:shadow-[0_8px_22px_rgba(0,0,0,0.45)]">
+        <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10">
+          <div className="flex min-h-[4.5rem] items-center justify-between gap-4 py-2">
             {/* Logo */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="bg-blue-600 p-2 rounded-lg">
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2 shadow-md">
                 <School className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-slate-900">TClass</span>
-              <Badge className="hidden sm:inline-flex bg-blue-100 text-blue-700 hover:bg-blue-100">Admin Portal</Badge>
+              <span className="text-xl font-bold text-slate-900 dark:text-slate-100">TClass</span>
+              <Badge className="hidden lg:inline-flex border border-blue-200 bg-blue-100 text-blue-700 hover:bg-blue-100 dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200">Admin Portal</Badge>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-5 mx-6 flex-1">
-              <a href="#" className="text-sm font-medium text-blue-600">Dashboard</a>
-              <button onClick={() => handleNavClick("Users")} className="text-sm font-medium text-slate-600 hover:text-slate-900">Users</button>
+            <nav className="mx-4 hidden min-w-0 flex-1 items-center gap-2 xl:mx-6 xl:gap-3 xl:flex">
+              <a href="#" className="nav-chip nav-chip-active">Dashboard</a>
+              <button onClick={() => handleNavClick("Users")} className="nav-chip">Users</button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="text-sm font-medium text-slate-600 hover:text-slate-900">Reports</button>
+                  <button className="nav-chip">Reports</button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem
@@ -857,44 +981,59 @@ export default function AdminDashboard() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button onClick={() => handleNavClick("Settings")} className="text-sm font-medium text-slate-600 hover:text-slate-900">Settings</button>
-              <Link href="/admin/enrollments" className="text-sm font-medium text-slate-600 hover:text-slate-900">Enrollments</Link>
+              <button onClick={() => handleNavClick("Settings")} className="nav-chip">Settings</button>
+              <Link href="/admin/enrollments" className="nav-chip">Enrollments</Link>
             </nav>
 
             {/* Right Section */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="relative hidden sm:block">
+            <div className="flex items-center gap-2 xl:gap-3 shrink-0">
+              <div className="relative hidden lg:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input 
                   placeholder="Search users..." 
-                  className="pl-9 w-52 lg:w-56 xl:w-64"
+                  className="w-44 rounded-full border-slate-200 bg-slate-50/90 pl-9 text-slate-700 placeholder:text-slate-500 focus-visible:bg-white lg:w-48 xl:w-56 2xl:w-64 dark:border-white/15 dark:bg-slate-900/85 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:bg-slate-900"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <div className="relative">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="relative"
-                  onClick={async () => {
-                    const next = !showNotifications;
-                    setShowNotifications(next);
-                    if (next) {
-                      await loadContactMessages(true);
-                    }
+              {!mobileMenuOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden rounded-full border border-transparent text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    setMobileSearchOpen(true);
                   }}
                 >
-                  <MessageSquare className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-[11px] font-semibold text-white flex items-center justify-center">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
+                  <Search className="h-5 w-5" />
                 </Button>
+              )}
+              <div className="relative">
+                {!mobileMenuOpen && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="relative rounded-full border border-transparent text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/10"
+                    onClick={async () => {
+                      const next = !showNotifications;
+                      setShowNotifications(next);
+                      if (next) {
+                        await loadContactMessages(true);
+                      }
+                    }}
+                  >
+                    <MessageSquare className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-[11px] font-semibold text-white flex items-center justify-center">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                )}
                 
                 {/* Notifications Dropdown */}
-                {showNotifications && (
+                {showNotifications && !mobileMenuOpen && (
                   <div className="absolute right-0 mt-2 w-80 rounded-lg border border-slate-200 bg-neutral-50 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-950">
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                       <div>
@@ -952,110 +1091,437 @@ export default function AdminDashboard() {
               </div>
               
               <div className="hidden sm:flex items-center gap-2">
-                <Avatar>
-                  <AvatarFallback className="bg-blue-100 text-blue-700">AD</AvatarFallback>
-                </Avatar>
-                <div className="hidden lg:block leading-tight">
-                  <p className="text-sm font-medium text-slate-900">Admin User</p>
-                  <p className="text-xs text-slate-500">Super Admin</p>
-                </div>
-                <ThemeToggle className="theme-toggle-inline" />
-                <Button variant="outline" size="sm" onClick={handleLogout} className="ml-1">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </Button>
+                <AvatarActionsMenu
+                  initials="AD"
+                  onLogout={handleLogout}
+                  triggerId="admin-avatar-menu-trigger"
+                />
               </div>
-              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
+              {!mobileMenuOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="xl:hidden text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setShowNotifications(false);
+                    setMobileSearchOpen(false);
+                    setMobileMenuOpen(true);
+                  }}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white">
-            <div className="px-4 py-3 space-y-1">
-              <a href="#" className="block px-3 py-2 rounded-md text-base font-medium text-blue-600 bg-blue-50">Dashboard</a>
-              <button onClick={() => { handleNavClick("Users"); setMobileMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Users</button>
-              <button onClick={() => { handleNavClick("Reports"); setMobileMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Reports</button>
-              <button onClick={() => { handleNavClick("Settings"); setMobileMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Settings</button>
-              <Link href="/admin/enrollments" className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Enrollments</Link>
-              <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50">Logout</button>
-            </div>
-          </div>
-        )}
       </header>
 
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-0 z-[120] xl:hidden transition-[visibility] duration-300 ${
+          mobileMenuOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"
+        }`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          className={`absolute inset-0 bg-slate-950/62 transition-opacity duration-300 ${
+            mobileMenuOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin mobile navigation"
+          className={`absolute left-0 top-0 h-full w-[84%] max-w-[21rem] border-r border-slate-200 bg-white shadow-[0_26px_65px_rgba(15,23,42,0.32)] transition-transform duration-300 ease-out dark:border-white/15 dark:bg-slate-950 dark:shadow-[0_26px_65px_rgba(0,0,0,0.65)] ${
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-white/15">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2 shadow-md">
+                  <School className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-slate-900 dark:text-slate-100">TClass</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Admin Portal</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="border-b border-slate-200 px-3 pb-3 pt-3 dark:border-white/10">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/15 dark:bg-slate-900">
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
+                <ThemeToggle className="theme-toggle-inline" />
+              </div>
+            </div>
+
+            <p className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">
+              Navigation
+            </p>
+            <div className="flex-1 space-y-1.5 overflow-y-auto px-2 pb-4">
+              <button
+                onClick={() => setAdminTabFromMobile("users")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeAdminTab === "users"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Users
+              </button>
+              <button
+                onClick={() => setAdminTabFromMobile("departments")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeAdminTab === "departments"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Building2 className="h-4 w-4" />
+                Departments
+              </button>
+              <button
+                onClick={() => setAdminTabFromMobile("admissions")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeAdminTab === "admissions"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Admissions
+              </button>
+              <button
+                onClick={() => setAdminTabFromMobile("vocationals")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeAdminTab === "vocationals"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Vocationals
+              </button>
+              <Link
+                href="/admin/enrollments"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                <BookOpen className="h-4 w-4" />
+                Enrollments
+              </Link>
+            </div>
+
+            <div className="border-t border-slate-200 p-3 dark:border-white/15">
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLogout();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <Dialog open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
+        <DialogContent className="flex h-[62vh] min-h-[24rem] w-[95vw] max-w-xl flex-col overflow-hidden border border-blue-200/70 bg-white p-0 shadow-2xl dark:border-blue-900/70 dark:bg-slate-950">
+          <DialogHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-4 dark:border-blue-900/40 dark:from-blue-950/45 dark:to-cyan-950/30">
+            <DialogTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">Search</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Search users, departments, admissions, and trends.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                autoFocus
+                value={universalSearchQuery}
+                onChange={(e) => setUniversalSearchQuery(e.target.value)}
+                placeholder="Search anything..."
+                className="h-11 rounded-xl border-slate-300 bg-slate-50 pl-9 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAdminTab("users");
+                  setMobileSearchOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Users
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAdminTab("departments");
+                  setMobileSearchOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Departments
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAdminTab("admissions");
+                  setMobileSearchOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Admissions
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAdminTab("vocationals");
+                  setMobileSearchOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Vocationals
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen(false);
+                  router.push("/admin/enrollments");
+                }}
+                className="col-span-2 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Enrollments
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[11rem] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/50">
+              {universalTerm ? (
+                totalUniversalMatches === 0 ? (
+                <p className="px-2 py-4 text-sm text-slate-600 dark:text-slate-300">No matches found for &quot;{universalSearchQuery}&quot;.</p>
+              ) : (
+                <div className="space-y-3">
+                  {matchedUsers.length > 0 && (
+                    <div>
+                      <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Users</p>
+                      <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                        {matchedUsers.map((user) => (
+                          <button
+                            key={`universal-user-${user.id}`}
+                            type="button"
+                            onClick={() => openUserFromUniversalSearch(user)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                          >
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {matchedDepartments.length > 0 && (
+                    <div>
+                      <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Departments</p>
+                      <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                        {matchedDepartments.map((department) => (
+                          <button
+                            key={`universal-department-${department.id}`}
+                            type="button"
+                            onClick={() => {
+                              setActiveAdminTab("departments");
+                              setMobileSearchOpen(false);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                          >
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{department.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Head: {department.head}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {matchedAdmissions.length > 0 && (
+                    <div>
+                      <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Admissions</p>
+                      <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                        {matchedAdmissions.map((item) => {
+                          const targetTab = (item.application_type ?? "admission") === "vocational" ? "vocationals" : "admissions";
+                          return (
+                            <button
+                              key={`universal-admission-${item.id}`}
+                              type="button"
+                              onClick={() => {
+                                setActiveAdminTab(targetTab);
+                                setMobileSearchOpen(false);
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                            >
+                              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.full_name}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {(item.application_type ?? "admission") === "vocational" ? "Vocational" : "Admission"} • {item.primary_course}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {matchedCourseTrends.length > 0 && (
+                    <div>
+                      <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">College Trends</p>
+                      <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                        {matchedCourseTrends.map((trend) => (
+                          <button
+                            key={`universal-course-${trend.course}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTrendCourse(trend);
+                              setSelectedYearLevel(null);
+                              setCourseTrendModalOpen(true);
+                              setMobileSearchOpen(false);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                          >
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{trend.course}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{trend.total} students</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {matchedVocationalTrends.length > 0 && (
+                    <div>
+                      <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Vocational Trends</p>
+                      <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                        {matchedVocationalTrends.map((trend) => (
+                          <button
+                            key={`universal-vocational-${trend.program}`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedVocational(trend);
+                              setSelectedVocationalBatch(null);
+                              setVocationalModalOpen(true);
+                              setMobileSearchOpen(false);
+                            }}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                          >
+                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{trend.program}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{trend.total} trainees</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )) : (
+                <p className="px-2 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  Search results will appear here.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setMobileSearchOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10 pt-6 pb-24 md:pb-8 sm:py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Dashboard</h1>
           <p className="text-slate-600 mt-1">Overview of school operations and management.</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Users className="h-5 w-5 text-blue-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 </div>
-                <div>
-                  <p className="text-xs text-slate-600">Students</p>
-                  <p className="text-xl font-bold text-slate-900">{stats.totalStudents}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Students</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{stats.totalStudents}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-100 rounded-lg">
-                  <GraduationCap className="h-5 w-5 text-indigo-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100">
+                  <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
                 </div>
-                <div>
-                  <p className="text-xs text-slate-600">Faculty</p>
-                  <p className="text-xl font-bold text-slate-900">{stats.totalFaculty}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <BookOpen className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-600">Classes</p>
-                  <p className="text-xl font-bold text-slate-900">{stats.totalClasses}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Faculty</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{stats.totalFaculty}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <Building2 className="h-5 w-5 text-amber-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                 </div>
-                <div>
-                  <p className="text-xs text-slate-600">Departments</p>
-                  <p className="text-xl font-bold text-slate-900">{stats.totalDepartments}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Classes</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{stats.totalClasses}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                  <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Departments</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{stats.totalDepartments}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-5 sm:space-y-6">
             <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="hidden h-auto w-full sm:grid sm:grid-cols-4 sm:gap-1 sm:p-1">
                 <TabsTrigger value="users">Users</TabsTrigger>
                 <TabsTrigger value="departments">Departments</TabsTrigger>
                 <TabsTrigger value="admissions">Admissions</TabsTrigger>
@@ -1067,17 +1533,28 @@ export default function AdminDashboard() {
                   <CardHeader>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <CardTitle>Recent Users</CardTitle>
-                      <div className="w-full sm:w-56">
-                        <Select value={userRoleFilter} onValueChange={(value: "student" | "faculty" | "admin") => setUserRoleFilter(value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="student">Student</SelectItem>
-                            <SelectItem value="faculty">Faculty</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                        <div className="w-full sm:w-56">
+                          <Select value={userRoleFilter} onValueChange={(value: "student" | "faculty" | "admin") => setUserRoleFilter(value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Student</SelectItem>
+                              <SelectItem value="faculty">Faculty</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="hidden md:inline-flex"
+                          onClick={() => setViewAllAccountsOpen(true)}
+                        >
+                          View all
+                        </Button>
                       </div>
                     </div>
                     <div>
@@ -1092,85 +1569,138 @@ export default function AdminDashboard() {
                         Showing {filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
                       </p>
                     )}
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Joined</TableHead>
-                          <TableHead className="w-[50px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {loadingUsers ? (
+                    <div className="space-y-3 md:hidden">
+                      {loadingUsers ? (
+                        <p className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">Loading users...</p>
+                      ) : filteredUsers.length === 0 ? (
+                        <p className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No users found.</p>
+                      ) : filteredUsers.slice(0, 1).map((user) => (
+                        <div key={user.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-slate-950/30">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Avatar className="h-9 w-9">
+                                <AvatarFallback className="text-xs bg-slate-100">
+                                  {user.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
+                                <p className="truncate text-xs text-slate-500">{user.email}</p>
+                              </div>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {!loadingUsers && filteredUsers.length > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-3 w-full md:hidden"
+                        onClick={() => setViewAllAccountsOpen(true)}
+                      >
+                        View all
+                      </Button>
+                    )}
+                    <div className="hidden md:block w-full overflow-x-auto">
+                      <Table className="min-w-[700px]">
+                        <TableHeader>
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-slate-500 py-8">
-                              Loading users...
-                            </TableCell>
+                            <TableHead>User</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Joined</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
-                        ) : filteredUsers.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center text-slate-500 py-8">
-                              No users found.
-                            </TableCell>
-                          </TableRow>
-                        ) : filteredUsers.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className="text-xs bg-slate-100">
-                                    {user.name.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium text-slate-900">{user.name}</p>
-                                  <p className="text-xs text-slate-500">{user.email}</p>
+                        </TableHeader>
+                        <TableBody>
+                          {loadingUsers ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                                Loading users...
+                              </TableCell>
+                            </TableRow>
+                          ) : filteredUsers.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                                No users found.
+                              </TableCell>
+                            </TableRow>
+                          ) : filteredUsers.map((user) => (
+                            <TableRow key={user.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="text-xs bg-slate-100">
+                                      {user.name.split(' ').map(n => n[0]).join('')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium text-slate-900">{user.name}</p>
+                                    <p className="text-xs text-slate-500">{user.email}</p>
+                                  </div>
                                 </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={user.role === 'Student' ? 'secondary' : 'default'}>
-                                {user.role}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {user.status === 'active' ? (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <Clock className="h-4 w-4 text-amber-500" />
-                                )}
-                                <span className={user.status === 'active' ? 'text-green-600' : 'text-amber-600'}>
-                                  {user.status}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-slate-500">{user.joined}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={user.role === 'Student' ? 'secondary' : 'default'}>
+                                  {user.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {user.status === 'active' ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                  ) : (
+                                    <Clock className="h-4 w-4 text-amber-500" />
+                                  )}
+                                  <span className={user.status === 'active' ? 'text-green-600' : 'text-amber-600'}>
+                                    {user.status}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-slate-500">{user.joined}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1178,7 +1708,7 @@ export default function AdminDashboard() {
               <TabsContent value="departments" className="mt-6">
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <CardTitle>Departments</CardTitle>
                         <CardDescription>Academic departments overview</CardDescription>
@@ -1228,8 +1758,8 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       {departments.map((dept) => (
-                        <div key={dept.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                          <div className="flex items-center gap-4">
+                        <div key={dept.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3 sm:gap-4">
                             <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
                               <Building2 className="h-6 w-6 text-blue-600" />
                             </div>
@@ -1238,7 +1768,7 @@ export default function AdminDashboard() {
                               <p className="text-sm text-slate-600">Head: {dept.head}</p>
                             </div>
                           </div>
-                          <div className="flex gap-6 text-sm">
+                          <div className="grid w-full grid-cols-3 gap-3 text-sm sm:w-auto sm:flex sm:gap-6">
                             <div className="text-center">
                               <p className="font-semibold text-slate-900">{dept.faculty}</p>
                               <p className="text-slate-500">Faculty</p>
@@ -1273,7 +1803,7 @@ export default function AdminDashboard() {
                     ) : (
                       <div className="space-y-3">
                         {pendingAdmissions.map((item) => (
-                          <div key={item.id} className="border border-slate-200 rounded-lg p-4 flex items-center justify-between gap-4">
+                          <div key={item.id} className="border border-slate-200 rounded-lg p-3 sm:p-4 flex flex-col items-start gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="font-semibold text-slate-900">{item.full_name}</p>
                               <p className="text-sm text-slate-600">
@@ -1292,10 +1822,10 @@ export default function AdminDashboard() {
                                 Thumbmark {item.right_thumbmark_path ? "yes" : "no"}
                               </p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                               <Button
                                 size="sm"
-                                className="bg-green-600 hover:bg-green-700"
+                                className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
                                 onClick={() => handleApproveAdmission(item.id)}
                                 disabled={approvingAdmissionId === item.id || submittingReject}
                               >
@@ -1311,6 +1841,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="destructive"
+                                className="w-full sm:w-auto"
                                 onClick={() => openRejectAdmissionModal(item.id)}
                                 disabled={approvingAdmissionId === item.id || submittingReject}
                               >
@@ -1352,7 +1883,7 @@ export default function AdminDashboard() {
                     ) : (
                       <div className="space-y-3">
                         {pendingVocationals.map((item) => (
-                          <div key={item.id} className="border border-slate-200 rounded-lg p-4 flex items-center justify-between gap-4">
+                          <div key={item.id} className="border border-slate-200 rounded-lg p-3 sm:p-4 flex flex-col items-start gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="font-semibold text-slate-900">{item.full_name}</p>
                               <p className="text-sm text-slate-600">
@@ -1378,10 +1909,10 @@ export default function AdminDashboard() {
                                 Thumbmark {item.right_thumbmark_path ? "yes" : "no"}
                               </p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                               <Button
                                 size="sm"
-                                className="bg-green-600 hover:bg-green-700"
+                                className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
                                 onClick={() => handleApproveAdmission(item.id)}
                                 disabled={approvingAdmissionId === item.id || submittingReject}
                               >
@@ -1397,6 +1928,7 @@ export default function AdminDashboard() {
                               <Button
                                 size="sm"
                                 variant="destructive"
+                                className="w-full sm:w-auto"
                                 onClick={() => openRejectAdmissionModal(item.id)}
                                 disabled={approvingAdmissionId === item.id || submittingReject}
                               >
@@ -1414,7 +1946,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
 {/* System Alerts */}
             <Card>
               <CardHeader>
@@ -1486,8 +2018,76 @@ export default function AdminDashboard() {
         </div>
       </main>
 
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed inset-x-3 bottom-3 z-[70] md:hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-xl backdrop-blur-md dark:border-white/15 dark:bg-slate-950/92">
+          <div className="grid grid-cols-5 gap-1">
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("users")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeAdminTab === "users"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <School className="h-4 w-4" />
+              Home
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("departments")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeAdminTab === "departments"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              Dept
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("admissions")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeAdminTab === "admissions"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <CheckCircle className="h-4 w-4" />
+              Admit
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab("vocationals")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeAdminTab === "vocationals"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Trends
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotifications(false);
+                setMobileSearchOpen(false);
+                setMobileMenuOpen(true);
+              }}
+              className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+            >
+              <Menu className="h-4 w-4" />
+              Menu
+            </button>
+          </div>
+        </div>
+      </nav>
+
       {activeMessagePreview && (
-        <div className="fixed bottom-4 right-4 z-[70] w-[24rem] max-w-[calc(100vw-1rem)] rounded-xl border border-slate-300 bg-white/98 shadow-2xl dark:border-slate-700 dark:bg-slate-950/98">
+        <div className="fixed inset-x-2 bottom-20 z-[70] w-auto max-w-[calc(100vw-1rem)] rounded-xl border border-slate-300 bg-white/98 shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-[24rem] dark:border-slate-700 dark:bg-slate-950/98">
           <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
@@ -1648,6 +2248,76 @@ export default function AdminDashboard() {
               variant="outline"
               onClick={() => setAllMessagesOpen(false)}
             >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewAllAccountsOpen} onOpenChange={setViewAllAccountsOpen}>
+        <DialogContent className="sm:max-w-xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">All Accounts</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Showing {filteredUsers.length} {userRoleFilter} account{filteredUsers.length !== 1 ? "s" : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className="max-h-[60vh] overflow-y-auto space-y-3 rounded-md border border-slate-200 p-2 dark:border-slate-700"
+            onScroll={handleViewAllUsersScroll}
+          >
+            {loadingUsers ? (
+              <p className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700">
+                Loading users...
+              </p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700">
+                No users found.
+              </p>
+            ) : (
+              <>
+                {visibleUsers.map((user) => (
+                  <div key={user.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-slate-950/30">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="text-xs bg-slate-100">
+                            {user.name.split(" ").map((n) => n[0]).join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{user.name}</p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+                <div className="pt-1 text-center text-xs text-slate-500 dark:text-slate-400">
+                  {hasMoreUsers ? "Scroll down to load 5 more accounts..." : "All accounts loaded."}
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewAllAccountsOpen(false)}>
               Close
             </Button>
           </DialogFooter>
@@ -1853,13 +2523,4 @@ export default function AdminDashboard() {
       </Dialog>
     </div>
   );
-}
-
-
-
-
-
-
-
-
-
+}

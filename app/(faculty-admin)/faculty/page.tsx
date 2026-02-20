@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { 
   BookOpen, 
   Users, 
@@ -34,11 +35,15 @@ import {
   Edit,
   Trash2,
   Eye,
-  Send
+  Send,
+  Home,
+  LogOut
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 
 // TypeScript Types
 interface Class {
@@ -131,8 +136,13 @@ const studentValueToName: Record<string, string> = {
 };
 
 export default function FacultyDashboard() {
+  const pathname = usePathname();
+  const router = useRouter();
   // UI State
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
+  const [activeFacultyTab, setActiveFacultyTab] = useState<"classes" | "grading" | "submissions">("classes");
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationCount, setNotificationCount] = useState(5);
   const [newClassDialogOpen, setNewClassDialogOpen] = useState(false);
@@ -239,6 +249,61 @@ export default function FacultyDashboard() {
       s.class.toLowerCase().includes(query)
     );
   }, [recentSubmissions, searchQuery]);
+
+  const normalizedMobileSearch = mobileSearchQuery.trim().toLowerCase();
+
+  type FacultySearchResult = {
+    id: string;
+    label: string;
+    meta: string;
+    kind: "route" | "tab";
+    href?: string;
+    tab?: "classes" | "grading" | "submissions";
+    query?: string;
+  };
+
+  const mobileSearchResults = useMemo<FacultySearchResult[]>(() => {
+    if (!normalizedMobileSearch) return [];
+
+    const routes: FacultySearchResult[] = [
+      { id: "route-dashboard", label: "Dashboard", meta: "/faculty", kind: "route", href: "/faculty" },
+      { id: "route-students", label: "Students", meta: "/faculty/students", kind: "route", href: "/faculty/students" },
+      { id: "route-assignments", label: "Assignments", meta: "/faculty/assignments", kind: "route", href: "/faculty/assignments" },
+      { id: "route-grades", label: "Grades", meta: "/faculty/grades", kind: "route", href: "/faculty/grades" },
+      { id: "route-classes", label: "My Classes", meta: "/faculty/classes", kind: "route", href: "/faculty/classes" },
+    ];
+
+    const classItems: FacultySearchResult[] = myClasses.map((cls) => ({
+      id: `class-${cls.id}`,
+      label: cls.name,
+      meta: `${cls.room} • ${cls.schedule}`,
+      kind: "tab",
+      tab: "classes",
+      query: cls.name,
+    }));
+
+    const gradingItems: FacultySearchResult[] = pendingGrading.map((item) => ({
+      id: `grading-${item.id}`,
+      label: item.title,
+      meta: `${item.class} • ${item.submissions}/${item.total}`,
+      kind: "tab",
+      tab: "grading",
+      query: item.title,
+    }));
+
+    const submissionItems: FacultySearchResult[] = recentSubmissions.map((item) => ({
+      id: `submission-${item.id}`,
+      label: item.assignment,
+      meta: `${item.student} • ${item.class}`,
+      kind: "tab",
+      tab: "submissions",
+      query: item.assignment,
+    }));
+
+    return [...routes, ...classItems, ...gradingItems, ...submissionItems].filter((item) =>
+      `${item.label} ${item.meta}`.toLowerCase().includes(normalizedMobileSearch)
+    );
+  }, [normalizedMobileSearch, myClasses, pendingGrading, recentSubmissions]);
 
   // Handlers
   const handleSearch = (e: React.FormEvent) => {
@@ -450,38 +515,117 @@ export default function FacultyDashboard() {
     toast.success("Filters cleared");
   };
 
+  const closeMobileOverlays = () => {
+    setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
+    setMobileSearchQuery("");
+  };
+
+  const openMobileRoute = (href: string) => {
+    closeMobileOverlays();
+    router.push(href);
+  };
+
+  const setFacultyTabFromMobile = (tab: "classes" | "grading" | "submissions") => {
+    setActiveFacultyTab(tab);
+    setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
+    if (pathname !== "/faculty") {
+      router.push("/faculty");
+    }
+  };
+
+  const handleMobileSearchSelect = (item: FacultySearchResult) => {
+    if (item.kind === "route" && item.href) {
+      openMobileRoute(item.href);
+      return;
+    }
+
+    if (item.tab) {
+      setActiveFacultyTab(item.tab);
+      if (item.query) {
+        setSearchQuery(item.query);
+      }
+      setMobileSearchOpen(false);
+      setMobileSearchQuery("");
+    }
+  };
+
+  const handleLogout = () => {
+    document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
+    document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
+    router.push("/login");
+    router.refresh();
+  };
+
+  useEffect(() => {
+    if (mobileMenuOpen || mobileSearchOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen, mobileSearchOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen && !mobileSearchOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileOverlays();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileMenuOpen, mobileSearchOpen]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 1280) {
+        closeMobileOverlays();
+      }
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="admin-page faculty-page min-h-screen bg-slate-50 dark:bg-transparent">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-[0_8px_20px_rgba(15,23,42,0.05)] backdrop-blur-md dark:border-white/12 dark:bg-slate-950/95 dark:shadow-[0_8px_22px_rgba(0,0,0,0.45)]">
+        <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10">
+          <div className="flex min-h-[4.5rem] items-center justify-between gap-4 py-2">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="bg-indigo-600 p-2 rounded-lg">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2 shadow-md">
                 <GraduationCap className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-slate-900">TClass</span>
-              <Badge className="hidden sm:inline-flex bg-indigo-100 text-indigo-700 hover:bg-indigo-100">Faculty Portal</Badge>
+              <span className="text-xl font-bold text-slate-900 dark:text-slate-100">TClass</span>
+              <Badge className="hidden xl:inline-flex border border-blue-200 bg-blue-100 text-blue-700 hover:bg-blue-100 dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200">Faculty Portal</Badge>
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-6">
-              <Link href="/faculty" className="text-sm font-medium text-indigo-600">Dashboard</Link>
-              <Link href="/faculty/classes" className="text-sm font-medium text-slate-600 hover:text-slate-900">My Classes</Link>
-              <Link href="/faculty/students" className="text-sm font-medium text-slate-600 hover:text-slate-900">Students</Link>
-              <Link href="/faculty/assignments" className="text-sm font-medium text-slate-600 hover:text-slate-900">Assignments</Link>
-              <Link href="/faculty/grades" className="text-sm font-medium text-slate-600 hover:text-slate-900">Grades</Link>
+            <nav className="hidden xl:flex items-center gap-2 xl:gap-3 flex-1 min-w-0 mx-4 xl:mx-6">
+              <Link href="/faculty" className="nav-chip nav-chip-active">Dashboard</Link>
+              <Link href="/faculty/classes" className="nav-chip">My Classes</Link>
+              <Link href="/faculty/students" className="nav-chip">Students</Link>
+              <Link href="/faculty/assignments" className="nav-chip">Assignments</Link>
+              <Link href="/faculty/grades" className="nav-chip">Grades</Link>
             </nav>
 
             {/* Right Section */}
-            <div className="flex items-center gap-4">
-              <form onSubmit={handleSearch} className="relative hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-2 xl:gap-3 shrink-0">
+              <form onSubmit={handleSearch} className="relative hidden lg:flex items-center gap-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input 
                     placeholder="Search classes, submissions..." 
-                    className="pl-9 w-64"
+                    className="w-44 lg:w-48 xl:w-56 2xl:w-64 rounded-full border-slate-200 bg-slate-50/90 pl-9 text-slate-700 placeholder:text-slate-500 focus-visible:bg-white dark:border-white/15 dark:bg-slate-900/85 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:bg-slate-900"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -516,101 +660,377 @@ export default function FacultyDashboard() {
                   </PopoverContent>
                 </Popover>
               </form>
-              
-              <Button variant="ghost" size="icon" className="relative" onClick={handleNotificationClick}>
+
+              {!mobileMenuOpen && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden rounded-full border border-transparent text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setMobileSearchOpen(true);
+                  }}
+                >
+                  <Search className="h-5 w-5" />
+                </Button>
+              )}
+
+              <Button variant="ghost" size="icon" className="relative rounded-full border border-transparent text-slate-600 transition-colors hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/10" onClick={handleNotificationClick}>
                 <Bell className="h-5 w-5" />
                 {notificationCount > 0 && (
                   <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
                 )}
               </Button>
-              <div className="hidden sm:flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback className="bg-indigo-100 text-indigo-700">PS</AvatarFallback>
-                </Avatar>
-                <div className="hidden lg:block">
-                  <p className="text-sm font-medium text-slate-900">Prof. Santos</p>
-                  <p className="text-xs text-slate-500">Mathematics Dept</p>
-                </div>
+              <div className="hidden sm:flex items-center gap-2">
+                <AvatarActionsMenu
+                  initials="PS"
+                  onLogout={handleLogout}
+                  triggerId="faculty-avatar-menu-trigger"
+                  fallbackClassName="bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-100"
+                />
               </div>
-              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
+              {!mobileMenuOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="xl:hidden text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setMobileSearchOpen(false);
+                    setMobileMenuOpen(true);
+                  }}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white">
-            <div className="px-4 py-3 space-y-1">
-              <Link href="/faculty" className="block px-3 py-2 rounded-md text-base font-medium text-indigo-600 bg-indigo-50">Dashboard</Link>
-              <Link href="/faculty/classes" className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">My Classes</Link>
-              <Link href="/faculty/students" className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Students</Link>
-              <Link href="/faculty/assignments" className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Assignments</Link>
-              <Link href="/faculty/grades" className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 hover:bg-slate-50">Grades</Link>
-            </div>
-          </div>
-        )}
       </header>
 
+      <div
+        className={`fixed inset-0 z-[120] xl:hidden transition-[visibility] duration-300 ${
+          mobileMenuOpen ? "visible pointer-events-auto" : "invisible pointer-events-none"
+        }`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        <button
+          type="button"
+          aria-label="Close sidebar"
+          className={`absolute inset-0 bg-slate-950/62 transition-opacity duration-300 ${
+            mobileMenuOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-label="Faculty mobile navigation"
+          className={`absolute left-0 top-0 h-full w-[84%] max-w-[21rem] border-r border-slate-200 bg-white shadow-[0_26px_65px_rgba(15,23,42,0.32)] transition-transform duration-300 ease-out dark:border-white/15 dark:bg-slate-950 dark:shadow-[0_26px_65px_rgba(0,0,0,0.65)] ${
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-white/15">
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-2 shadow-md">
+                  <GraduationCap className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-slate-900 dark:text-slate-100">TClass</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Faculty Portal</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="border-b border-slate-200 px-3 pb-3 pt-3 dark:border-white/10">
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/15 dark:bg-slate-900">
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
+                <ThemeToggle className="theme-toggle-inline" />
+              </div>
+            </div>
+
+            <p className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">
+              Navigation
+            </p>
+            <div className="flex-1 space-y-1.5 overflow-y-auto px-2 pb-4">
+              <Link
+                href="/faculty"
+                onClick={closeMobileOverlays}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  pathname === "/faculty"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Home className="h-4 w-4" />
+                Dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={() => setFacultyTabFromMobile("classes")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeFacultyTab === "classes"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <BookOpen className="h-4 w-4" />
+                My Classes
+              </button>
+              <button
+                type="button"
+                onClick={() => setFacultyTabFromMobile("grading")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeFacultyTab === "grading"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                Grading
+              </button>
+              <button
+                type="button"
+                onClick={() => setFacultyTabFromMobile("submissions")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeFacultyTab === "submissions"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                Submissions
+              </button>
+              <Link
+                href="/faculty/students"
+                onClick={closeMobileOverlays}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  pathname.startsWith("/faculty/students")
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Students
+              </Link>
+              <Link
+                href="/faculty/assignments"
+                onClick={closeMobileOverlays}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  pathname.startsWith("/faculty/assignments")
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                Assignments
+              </Link>
+              <Link
+                href="/faculty/grades"
+                onClick={closeMobileOverlays}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  pathname.startsWith("/faculty/grades")
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                Grades
+              </Link>
+            </div>
+
+            <div className="border-t border-slate-200 p-3 dark:border-white/15">
+              <button
+                onClick={() => {
+                  closeMobileOverlays();
+                  handleLogout();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <Dialog
+        open={mobileSearchOpen}
+        onOpenChange={(open) => {
+          setMobileSearchOpen(open);
+          if (!open) {
+            setMobileSearchQuery("");
+          }
+        }}
+      >
+        <DialogContent className="flex h-[62vh] min-h-[24rem] w-[95vw] max-w-xl flex-col overflow-hidden border border-blue-200/70 bg-white p-0 shadow-2xl dark:border-blue-900/70 dark:bg-slate-950">
+          <DialogHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-4 dark:border-blue-900/40 dark:from-blue-950/45 dark:to-cyan-950/30">
+            <DialogTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">Search</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Find classes, grading items, and faculty pages quickly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                autoFocus
+                value={mobileSearchQuery}
+                onChange={(event) => setMobileSearchQuery(event.target.value)}
+                placeholder="Search anything..."
+                className="h-11 rounded-xl border-slate-300 bg-slate-50 pl-9 text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFacultyTabFromMobile("classes");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Classes
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFacultyTabFromMobile("grading");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Grading
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFacultyTabFromMobile("submissions");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Submissions
+              </button>
+              <button
+                type="button"
+                onClick={() => openMobileRoute("/faculty/students")}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Students
+              </button>
+              <button
+                type="button"
+                onClick={() => openMobileRoute("/faculty/assignments")}
+                className="col-span-2 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Assignments
+              </button>
+            </div>
+
+            <div className="flex-1 min-h-[11rem] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/60 p-2 dark:border-slate-800 dark:bg-slate-900/50">
+              {normalizedMobileSearch ? (
+                mobileSearchResults.length > 0 ? (
+                  <div className="max-h-[10.5rem] space-y-1 overflow-y-auto pr-1">
+                    {mobileSearchResults.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleMobileSearchSelect(item)}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
+                      >
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{item.meta}</p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-2 py-4 text-sm text-slate-600 dark:text-slate-300">
+                    No matches found for &quot;{mobileSearchQuery}&quot;.
+                  </p>
+                )
+              ) : (
+                <p className="px-2 py-4 text-sm text-slate-500 dark:text-slate-400">
+                  Search results will appear here.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setMobileSearchOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8 xl:px-10 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pt-8 md:pb-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Welcome back, Prof. Santos!</h1>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome back, Prof. Santos!</h1>
           <p className="text-slate-600 mt-1">Manage your classes and track student progress.</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6 sm:mb-8">
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-100 rounded-lg">
-                  <BookOpen className="h-6 w-6 text-indigo-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Active Classes</p>
-                  <p className="text-2xl font-bold text-slate-900">{myClasses.length}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Active Classes</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{myClasses.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Users className="h-6 w-6 text-blue-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Total Students</p>
-                  <p className="text-2xl font-bold text-slate-900">{totalStudents}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-amber-100 rounded-lg">
-                  <ClipboardCheck className="h-6 w-6 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">To Grade</p>
-                  <p className="text-2xl font-bold text-slate-900">{toGradeCount}</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Students</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{totalStudents}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                  <ClipboardCheck className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-slate-600">Avg. Pass Rate</p>
-                  <p className="text-2xl font-bold text-slate-900">87%</p>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">To Grade</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">{toGradeCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100">
+                  <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] sm:text-xs font-medium uppercase tracking-[0.02em] text-slate-600">Pass Rate</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900">87%</p>
                 </div>
               </div>
             </CardContent>
@@ -645,20 +1065,24 @@ export default function FacultyDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Main Content Area */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="classes" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="classes">My Classes</TabsTrigger>
-                <TabsTrigger value="grading">Grading</TabsTrigger>
-                <TabsTrigger value="submissions">Submissions</TabsTrigger>
+            <Tabs
+              value={activeFacultyTab}
+              onValueChange={(value) => setActiveFacultyTab(value as "classes" | "grading" | "submissions")}
+              className="w-full"
+            >
+              <TabsList className="hidden h-auto w-full grid-cols-3 gap-1 p-1 md:grid">
+                <TabsTrigger value="classes" className="min-h-9 px-2 text-[11px] font-medium sm:text-sm">My Classes</TabsTrigger>
+                <TabsTrigger value="grading" className="min-h-9 px-2 text-[11px] font-medium sm:text-sm">Grading</TabsTrigger>
+                <TabsTrigger value="submissions" className="min-h-9 px-2 text-[11px] font-medium sm:text-sm">Submissions</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="classes" className="mt-6">
+              <TabsContent value="classes" className="mt-4 md:mt-6">
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <CardTitle>My Classes</CardTitle>
                         <CardDescription>
@@ -670,7 +1094,7 @@ export default function FacultyDashboard() {
                       </div>
                       <Dialog open={newClassDialogOpen} onOpenChange={setNewClassDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button size="sm">
+                          <Button size="sm" className="w-full sm:w-auto">
                             <Plus className="h-4 w-4 mr-1" />
                             New Class
                           </Button>
@@ -740,7 +1164,7 @@ export default function FacultyDashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {filteredClasses.length === 0 ? (
                         <div className="text-center py-8 text-slate-500">
                           <BookOpen className="h-12 w-12 mx-auto mb-3 text-slate-300" />
@@ -753,8 +1177,8 @@ export default function FacultyDashboard() {
                         </div>
                       ) : (
                         filteredClasses.map((cls) => (
-                          <div key={cls.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                            <div className="flex items-center gap-4">
+                          <div key={cls.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3 sm:gap-4">
                               <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
                                 <BookOpen className="h-6 w-6 text-indigo-600" />
                               </div>
@@ -768,7 +1192,7 @@ export default function FacultyDashboard() {
                                 <p className="text-sm text-slate-600">{cls.students} students • {cls.schedule}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex w-full items-center justify-between sm:w-auto sm:justify-start sm:gap-3">
                               <Badge variant="outline">{cls.room}</Badge>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -803,14 +1227,14 @@ export default function FacultyDashboard() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="grading" className="mt-6">
+              <TabsContent value="grading" className="mt-4 md:mt-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>Pending Grading</CardTitle>
                     <CardDescription>Assignments waiting for your review</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {pendingGrading.length === 0 ? (
                         <div className="text-center py-8 text-slate-500">
                           <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-300" />
@@ -818,7 +1242,7 @@ export default function FacultyDashboard() {
                         </div>
                       ) : (
                         pendingGrading.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                          <div key={item.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-amber-100 rounded-lg">
                                 <ClipboardCheck className="h-5 w-5 text-amber-600" />
@@ -828,13 +1252,13 @@ export default function FacultyDashboard() {
                                 <p className="text-sm text-slate-600">{item.class}</p>
                               </div>
                             </div>
-                            <div className="text-right">
+                            <div className="w-full text-left sm:w-auto sm:text-right">
                               <p className="text-sm font-medium text-slate-900">{item.submissions}/{item.total}</p>
                               <p className="text-xs text-slate-500">submissions</p>
                               <Badge variant={item.due === "Yesterday" ? "destructive" : "secondary"} className="mt-1">
                                 {item.due}
                               </Badge>
-                              <Button size="sm" className="ml-2" onClick={() => handleGradeItem(item.id)}>Grade</Button>
+                              <Button size="sm" className="mt-2 w-full sm:ml-2 sm:mt-0 sm:w-auto" onClick={() => handleGradeItem(item.id)}>Grade</Button>
                             </div>
                           </div>
                         ))
@@ -844,10 +1268,10 @@ export default function FacultyDashboard() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="submissions" className="mt-6">
+              <TabsContent value="submissions" className="mt-4 md:mt-6">
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <CardTitle>Recent Submissions</CardTitle>
                         <CardDescription>
@@ -868,7 +1292,7 @@ export default function FacultyDashboard() {
                         </div>
                       ) : (
                         filteredSubmissions.map((submission) => (
-                          <div key={submission.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                          <div key={submission.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
                                 <AvatarFallback className="text-xs bg-slate-100">
@@ -880,7 +1304,7 @@ export default function FacultyDashboard() {
                                 <p className="text-sm text-slate-600">{submission.assignment} • {submission.class}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
                               <span className="text-sm text-slate-500">{submission.submitted}</span>
                               <Badge variant={
                                 submission.status === 'new' ? 'default' : 
@@ -935,7 +1359,7 @@ export default function FacultyDashboard() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -1269,6 +1693,79 @@ export default function FacultyDashboard() {
           </div>
         </div>
       </main>
+
+      <nav className="fixed inset-x-3 bottom-3 z-[70] pb-[env(safe-area-inset-bottom)] md:hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-xl backdrop-blur-md dark:border-white/15 dark:bg-slate-950/92">
+          <div className="grid grid-cols-5 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                router.push("/faculty");
+                setActiveFacultyTab("classes");
+              }}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                pathname === "/faculty" && activeFacultyTab === "classes"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <Home className="h-4 w-4" />
+              Home
+            </button>
+            <button
+              type="button"
+              onClick={() => setFacultyTabFromMobile("grading")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeFacultyTab === "grading"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              Grade
+            </button>
+            <button
+              type="button"
+              onClick={() => setFacultyTabFromMobile("submissions")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                activeFacultyTab === "submissions"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Submit
+            </button>
+            <button
+              type="button"
+              onClick={() => openMobileRoute("/faculty/students")}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                pathname.startsWith("/faculty/students")
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              Students
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileSearchOpen(false);
+                setMobileMenuOpen(true);
+              }}
+              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
+                mobileMenuOpen
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
+              }`}
+            >
+              <Menu className="h-4 w-4" />
+              Menu
+            </button>
+          </div>
+        </div>
+      </nav>
 
       {/* Edit Class Dialog */}
       <Dialog open={editClassDialogOpen} onOpenChange={setEditClassDialogOpen}>
