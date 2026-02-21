@@ -1,216 +1,336 @@
-# Local Setup Guide (New Device)
+# Complete Local Setup Guide (New Device)
 
-This guide sets up both projects locally:
+This guide walks you through setting up the TClass School Management System on a new machine. Both frontend (Next.js) and backend (Laravel) are required.
 
-- Frontend: https://github.com/primex-joseph/Tclass-website.git
-- Backend: https://github.com/primex-joseph/Tclass-website-backend.git
+## 📋 Prerequisites
 
-## 1. Prerequisites
+Install these before starting:
 
-Install these first:
+| Software | Version | Download |
+|----------|---------|----------|
+| Git | Latest | [git-scm.com](https://git-scm.com) |
+| Node.js | 18+ LTS | [nodejs.org](https://nodejs.org) |
+| PHP | 8.1+ (8.2 recommended) | [php.net](https://php.net) |
+| Composer | Latest | [getcomposer.org](https://getcomposer.org) |
+| MySQL/MariaDB | 5.7+ / 10.3+ | Included with XAMPP |
 
-- Git
-- Node.js 18+ and npm
-- PHP 8.1+ (8.2 recommended)
-- Composer
-- MySQL/MariaDB
-- (Optional, Windows) XAMPP/Laragon for PHP + MySQL stack
+**Windows Users**: Install [XAMPP](https://www.apachefriends.org) for PHP + MySQL + phpMyAdmin stack.
 
-## 2. Clone Repositories
+## 📁 Recommended Folder Structure
 
-Choose a parent folder, then clone both repos:
+```
+C:\Projects\
+├── Tclass-website\              (frontend)
+└── Tclass-website-backend\      (backend)
+```
+
+---
+
+## 🖥 Part 1: Backend Setup (Laravel)
+
+### 1. Clone Backend Repository
 
 ```powershell
-git clone https://github.com/primex-joseph/Tclass-website.git
+cd C:\Projects
 git clone https://github.com/primex-joseph/Tclass-website-backend.git
 ```
 
-Result:
-
-- `Tclass-website` (frontend)
-- `Tclass-website-backend` (backend)
-
-## 3. Backend Setup (Laravel)
-
-Go to backend:
+### 2. Navigate to Backend Folder
 
 ```powershell
 cd Tclass-website-backend
 ```
 
-Install PHP dependencies:
+### 3. Install PHP Dependencies
 
 ```powershell
 composer install
 ```
 
-Copy env:
+### 4. Configure Environment
+
+Copy example environment file:
 
 ```powershell
-Copy-Item .env.example .env
+# Windows
+copy .env.example .env
+
+# Mac/Linux
+cp .env.example .env
 ```
 
-Generate app key:
-
-```powershell
-php artisan key:generate
-```
-
-### Configure backend `.env`
-
-Update at least these values:
+Edit `.env` and configure:
 
 ```env
+# Application
 APP_NAME="TClass"
 APP_ENV=local
 APP_DEBUG=true
 APP_URL=http://127.0.0.1:8000
 
+# Database
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=tclass_db
 DB_USERNAME=root
-DB_PASSWORD=
+DB_PASSWORD=          # Your MySQL password
 
+# Frontend (CORS)
 FRONTEND_URL=http://localhost:3000
 SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000
 SESSION_DOMAIN=localhost
 
+# Email (SMTP)
 MAIL_MAILER=smtp
-MAIL_HOST=...
-MAIL_PORT=...
-MAIL_USERNAME=...
-MAIL_PASSWORD=...
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=...
+MAIL_FROM_ADDRESS=your-email@gmail.com
 MAIL_FROM_NAME="Tarlac Center for Learning and Skills Success"
-CONTACT_RECEIVER_EMAIL=...
+CONTACT_RECEIVER_EMAIL=receiver@example.com
 ```
 
-Create database (example name above: `tclass_db`) in MySQL.
+### 5. Generate Application Key
 
-Run migrations:
+```powershell
+php artisan key:generate
+```
+
+### 6. Create Database
+
+1. Open phpMyAdmin (http://localhost/phpmyadmin)
+2. Click "New" database
+3. Name it: `tclass_db`
+4. Collation: `utf8mb4_unicode_ci`
+
+Or via MySQL CLI:
+
+```sql
+CREATE DATABASE tclass_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 7. Run Migrations
 
 ```powershell
 php artisan migrate
 ```
 
-Clear cached config:
+### 8. Create Storage Link
 
 ```powershell
-php artisan config:clear
-php artisan cache:clear
+php artisan storage:link
 ```
 
-Start backend server:
+### 9. Seed Database (Optional)
 
 ```powershell
-php artisan serve
+php artisan db:seed
 ```
 
-Backend URL: `http://127.0.0.1:8000`
+### 10. Start Backend Server
 
-## 4. Frontend Setup (Next.js)
+```powershell
+php artisan serve --host=127.0.0.1 --port=8000
+```
 
-Open a new terminal, go to frontend:
+Backend is now running at: `http://127.0.0.1:8000`
+
+---
+
+## 🎨 Part 2: Frontend Setup (Next.js)
+
+### 1. Clone Frontend Repository
+
+Open a **new terminal** (don't close the backend one):
+
+```powershell
+cd C:\Projects
+git clone https://github.com/primex-joseph/Tclass-website.git
+```
+
+### 2. Navigate to Frontend Folder
 
 ```powershell
 cd Tclass-website
 ```
 
-Install dependencies:
+### 3. Install Node Dependencies
 
 ```powershell
 npm install
 ```
 
-Copy env:
+This installs:
+- Next.js 15
+- React 19
+- Tailwind CSS 4
+- shadcn/ui components
+- Lucide icons
+- And all other dependencies from `package.json`
+
+### 4. Configure Environment
+
+Create `.env.local`:
 
 ```powershell
+# Windows
 Copy-Item .env.example .env.local
+
+# Mac/Linux  
+cp .env.example .env.local
 ```
 
-### Configure frontend `.env.local`
-
-Set API base URL:
+Edit `.env.local`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api
 ```
 
-Start frontend server:
+### 5. Start Frontend Development Server
 
 ```powershell
 npm run dev
 ```
 
-Frontend URL: `http://localhost:3000`
+Frontend is now running at: `http://localhost:3000`
 
-## 5. Login / Test Flow
+---
 
-- Open `http://localhost:3000`
-- Use your existing seeded/admin/student accounts (if available)
-- If no users exist yet, create/seed users from backend (project-specific seeding/creation flow)
+## ✅ Verification Checklist
 
-## 6. Common Issues
+After both servers are running, verify:
 
-### A) CORS / 401 / CSRF issues
+- [ ] Landing page loads: `http://localhost:3000`
+- [ ] Login page works: `http://localhost:3000/login`
+- [ ] Can login with test credentials
+- [ ] Backend API responds: `http://127.0.0.1:8000/api`
+- [ ] Contact form submission works
+- [ ] Theme toggle (light/dark) persists
 
-- Confirm backend `.env` values:
-  - `FRONTEND_URL=http://localhost:3000`
-  - `SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000`
-- Run:
+---
 
+## 🔄 Daily Development Workflow
+
+Keep **two terminals** open:
+
+### Terminal 1 - Backend
 ```powershell
-php artisan config:clear
-php artisan cache:clear
+cd C:\Projects\Tclass-website-backend
+php artisan serve --host=127.0.0.1 --port=8000
 ```
 
-### B) Frontend not reflecting latest changes
-
+### Terminal 2 - Frontend
 ```powershell
-# from frontend folder
+cd C:\Projects\Tclass-website
+npm run dev
+```
+
+---
+
+## 🐛 Common Issues & Solutions
+
+### Issue: CORS / 401 / CSRF Errors
+
+**Solution:**
+```powershell
+# Clear all caches
+php artisan config:clear
+php artisan cache:clear
+php artisan view:clear
+```
+
+Verify `.env` values:
+```env
+FRONTEND_URL=http://localhost:3000
+SANCTUM_STATEFUL_DOMAINS=localhost:3000,127.0.0.1:3000
+```
+
+### Issue: Frontend changes not reflecting
+
+**Solution:**
+```powershell
+# Clear Next.js cache
 Remove-Item -Recurse -Force .next
 npm run dev
 ```
 
-### C) Backend route/config changes not reflected
+### Issue: Port 3000 already in use
 
+**Solution:**
 ```powershell
-php artisan optimize:clear
-php artisan serve
-```
-
-### D) Email not sending
-
-- Verify SMTP values in backend `.env`
-- Check `storage/logs/laravel.log`
-
-## 7. Daily Run Commands
-
-Backend terminal:
-
-```powershell
-cd Tclass-website-backend
-php artisan serve
-```
-
-Frontend terminal:
-
-```powershell
-cd Tclass-website
+npx kill-port 3000
 npm run dev
 ```
 
-## 8. Suggested Folder Layout
+### Issue: Database connection failed
 
-Keep both repos side-by-side:
+**Solution:**
+- Verify MySQL is running (XAMPP Control Panel)
+- Check `.env` DB credentials
+- Ensure database `tclass_db` exists
 
-```text
-C:\Projects\
-  Tclass-website\
-  Tclass-website-backend\
+### Issue: Email not sending
+
+**Solution:**
+- Verify SMTP credentials in backend `.env`
+- For Gmail: Use App Password (not regular password)
+- Check `storage/logs/laravel.log` for errors
+
+### Issue: Image uploads not working
+
+**Solution:**
+```powershell
+php artisan storage:link
 ```
 
-This makes local full-stack dev simpler.
+---
+
+## 📦 Dependencies Summary
+
+### Backend (composer.json)
+- Laravel 10.x
+- Laravel Sanctum (API authentication)
+- Illuminate packages
+- PHPMailer (email)
+
+### Frontend (package.json)
+- next: ^15.x
+- react: ^19.x
+- typescript: ^5.x
+- tailwindcss: ^4.x
+- @radix-ui/* (shadcn/ui primitives)
+- lucide-react (icons)
+- react-hot-toast (notifications)
+- class-variance-authority
+- clsx, tailwind-merge (utilities)
+
+---
+
+## 📚 Additional Documentation
+
+- [docs/frontend-setup.md](./docs/frontend-setup.md) - Detailed frontend guide
+- [docs/AI_PROMPT.md](./docs/AI_PROMPT.md) - AI assistant instructions
+- Backend docs: See `Tclass-website-backend/docs/`
+
+---
+
+## 🆘 Need Help?
+
+If you encounter issues:
+
+1. Check this guide's troubleshooting section
+2. Review backend logs: `storage/logs/laravel.log`
+3. Check browser console for frontend errors
+4. Verify all prerequisites are installed correctly
+
+---
+
+## 📝 Notes
+
+- **Port Configuration**: Backend uses `8000`, Frontend uses `3000`
+- **Database**: MySQL/MariaDB required
+- **Email**: SMTP configuration required for contact forms
+- **Storage**: Ensure `storage/app/public` is writable

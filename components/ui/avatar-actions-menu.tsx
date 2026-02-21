@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 interface AvatarActionsMenuProps {
   initials: string;
   onLogout: () => void;
+  onSettings?: () => void;
   name?: string;
   subtitle?: string;
   triggerId?: string;
@@ -29,6 +30,7 @@ interface AvatarActionsMenuProps {
 export function AvatarActionsMenu({
   initials,
   onLogout,
+  onSettings,
   name,
   subtitle,
   triggerId,
@@ -85,6 +87,16 @@ export function AvatarActionsMenu({
         </div>
 
         <DropdownMenuSeparator className="bg-slate-200 dark:bg-white/10" />
+
+        {onSettings && (
+          <DropdownMenuItem
+            onClick={onSettings}
+            className="gap-2 rounded-md text-slate-700 focus:bg-slate-100 focus:text-slate-900 dark:text-slate-200 dark:focus:bg-slate-800 dark:focus:text-slate-100"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem
           onClick={onLogout}

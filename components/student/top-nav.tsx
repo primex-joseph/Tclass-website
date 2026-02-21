@@ -21,6 +21,7 @@ import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LogoutModal } from "@/components/ui/logout-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,7 @@ export function StudentTopNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileSearchQuery, setMobileSearchQuery] = useState("");
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   const searchItems = useMemo(
     () => [
@@ -58,9 +60,13 @@ export function StudentTopNav() {
     : [];
 
   const handleLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
-    router.push("/login");
+    router.push("/");
     router.refresh();
   };
 
@@ -570,6 +576,12 @@ export function StudentTopNav() {
         </div>
       </div>
       </nav>
+
+      <LogoutModal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </>
   );
 }

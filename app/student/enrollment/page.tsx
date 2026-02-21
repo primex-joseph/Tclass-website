@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { FileDown, Wand2 } from "lucide-react";
 
+import { EnrollmentPageSkeleton } from "@/components/ui/loading-states";
+
 import { apiFetch } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,6 +111,7 @@ export default function StudentEnrollmentPage() {
   const [periodId, setPeriodId] = useState<string>("");
   const [evalRows, setEvalRows] = useState<EvalRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
 
   const [selectedAvailableId, setSelectedAvailableId] = useState<number | null>(null);
   const [preEnlisted, setPreEnlisted] = useState<SubjectOption[]>([]);
@@ -138,6 +141,11 @@ export default function StudentEnrollmentPage() {
       }
     };
     run();
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setPageLoading(false), 600);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -302,6 +310,18 @@ export default function StudentEnrollmentPage() {
     toast.success("Opening COR PDF...");
     openSubjectListPdf();
   };
+
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-2xl mx-auto">
+            <EnrollmentPageSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <main className="student-page min-h-screen bg-slate-100 p-4 md:p-6 dark:bg-transparent">

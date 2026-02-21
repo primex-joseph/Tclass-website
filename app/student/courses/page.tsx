@@ -1,5 +1,6 @@
 "use client";
 
+import { CoursesPageSkeleton } from "@/components/ui/loading-states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ import {
   HardHat,
   Building2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -70,6 +71,15 @@ export default function CoursesPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [messageSubject, setMessageSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate data loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [courses] = useState<Course[]>([
     // Heavy Equipment Operations
@@ -280,6 +290,16 @@ export default function CoursesPage() {
       default: return <File className="h-5 w-5 text-slate-500" />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <CoursesPageSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

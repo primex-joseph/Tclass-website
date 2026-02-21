@@ -36,6 +36,7 @@ function LoginPageContent() {
   const [userType, setUserType] = useState<UserRole>("student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [switchingRole, setSwitchingRole] = useState<UserRole | null>(null);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -187,14 +188,17 @@ function LoginPageContent() {
         {/* Right Side - Form */}
         <div className="flex-1 p-8 sm:p-10 xl:p-12 flex flex-col justify-center">
           {/* Mobile Header */}
-          <div className="lg:hidden flex items-center gap-3 mb-6">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden">
-              <Image src="/tclass-logo.jpg" alt="TCLASS" fill className="object-cover" priority />
+          <div className="lg:hidden flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="relative w-12 h-12 rounded-xl overflow-hidden">
+                <Image src="/tclass-logo.jpg" alt="TCLASS" fill className="object-cover" priority />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white">TCLASS Portal</h1>
+                <p className="text-slate-500 dark:text-slate-400 text-xs">Sign in to continue</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">TCLASS Portal</h1>
-              <p className="text-slate-500 dark:text-slate-400 text-xs">Sign in to continue</p>
-            </div>
+            <ThemeIconButton />
           </div>
 
           {/* Desktop Header */}
@@ -212,13 +216,30 @@ function LoginPageContent() {
               <button
                 key={type.id}
                 type="button"
-                onClick={() => setUserType(type.id)}
-                className={`flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${
+                onClick={() => {
+                  if (type.id !== userType) {
+                    setSwitchingRole(type.id);
+                    setTimeout(() => {
+                      setUserType(type.id);
+                      setSwitchingRole(null);
+                    }, 400);
+                  }
+                }}
+                disabled={switchingRole !== null}
+                className={`relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 overflow-hidden ${
                   userType === type.id
                     ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10"
                     : "border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700"
-                }`}
+                } ${switchingRole === type.id ? "scale-95" : ""}`}
               >
+                {/* Loading overlay */}
+                {switchingRole === type.id && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm z-10">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-5 w-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  </div>
+                )}
                 <div className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
                   userType === type.id
                     ? "bg-blue-600 text-white"
@@ -246,7 +267,7 @@ function LoginPageContent() {
                 <Input
                   id="email"
                   type="text"
-                  className="pl-11 h-12 text-base rounded-xl bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 dark:bg-slate-800/90 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30"
+                  className="pl-11 h-12 text-base rounded-xl bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 dark:bg-[#1e293b] dark:border-slate-600 dark:text-white dark:placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
                   placeholder="Enter your email or username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -270,7 +291,7 @@ function LoginPageContent() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="pl-11 pr-11 h-12 text-base rounded-xl bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 dark:bg-slate-800/90 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30"
+                  className="pl-11 pr-11 h-12 text-base rounded-xl bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 dark:bg-[#1e293b] dark:border-slate-600 dark:text-white dark:placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

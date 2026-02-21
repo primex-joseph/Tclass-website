@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
+import { StudentDashboardSkeleton } from "@/components/ui/loading-states";
 
 interface Course {
   id: number;
@@ -73,6 +74,7 @@ export default function StudentLandingPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [studentFirstName, setStudentFirstName] = useState("Student");
+  const [isLoading, setIsLoading] = useState(true);
 
   const [courses, setCourses] = useState<Course[]>([
     { id: 1, name: "Rigid Highway Dump Truck NCII", instructor: "Engr. Dela Cruz", schedule: "Mon/Wed/Fri 8:00 AM", progress: 75 },
@@ -101,7 +103,7 @@ export default function StudentLandingPage() {
   const [messages, setMessages] = useState<{id: number, recipient: string, subject: string, sentAt: string}[]>([]);
 
   useEffect(() => {
-    apiFetch("/auth/me")
+    const authPromise = apiFetch("/auth/me")
       .then((res) => {
         const name = (res as AuthMeResponse).user?.name;
         setStudentFirstName(extractFirstName(name));
@@ -109,10 +111,8 @@ export default function StudentLandingPage() {
       .catch(() => {
         setStudentFirstName("Student");
       });
-  }, []);
 
-  useEffect(() => {
-    apiFetch("/student/profile/password-reminder")
+    const passwordPromise = apiFetch("/student/profile/password-reminder")
       .then((res) => {
         const required = Boolean((res as { must_change_password?: boolean }).must_change_password);
         setMustChangePassword(required);
@@ -122,6 +122,10 @@ export default function StudentLandingPage() {
         setMustChangePassword(false);
         setForcePasswordModalOpen(false);
       });
+
+    Promise.all([authPromise, passwordPromise]).finally(() => {
+      setIsLoading(false);
+    });
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -259,6 +263,16 @@ export default function StudentLandingPage() {
 
   const pendingCount = assignments.filter(a => a.status === "pending").length;
   const completedCount = assignments.filter(a => a.status === "completed").length;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <StudentDashboardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="student-page min-h-screen bg-slate-50">    {/* Main Content */}

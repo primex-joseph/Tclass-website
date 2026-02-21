@@ -58,7 +58,19 @@ import {
   Trash2,
   Edit,
   Loader2,
-  LogOut
+  LogOut,
+  Inbox,
+  Filter,
+  Reply,
+  Archive,
+  Mail,
+  MailOpen,
+  ChevronLeft,
+  UserCircle2,
+  Calendar,
+  CornerUpLeft,
+  CheckCheck,
+  Trash
 } from "lucide-react";
 import { useEffect, useState, type UIEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -66,6 +78,8 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
+import { LogoutModal } from "@/components/ui/logout-modal";
+import { AdminDashboardSkeleton } from "@/components/ui/loading-states";
 
 // Types
 interface UserItem {
@@ -295,6 +309,7 @@ export default function AdminDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [universalSearchQuery, setUniversalSearchQuery] = useState("");
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
   // Dialog states
@@ -325,6 +340,9 @@ export default function AdminDashboard() {
   const [viewAllAccountsOpen, setViewAllAccountsOpen] = useState(false);
   const [visibleAccountsCount, setVisibleAccountsCount] = useState(5);
   const [activeMessagePreview, setActiveMessagePreview] = useState<ContactMessageItem | null>(null);
+  const [messageSearchQuery, setMessageSearchQuery] = useState("");
+  const [messageFilter, setMessageFilter] = useState<"all" | "unread" | "read">("all");
+  const [selectedMessageThread, setSelectedMessageThread] = useState<ContactMessageItem | null>(null);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
@@ -342,6 +360,7 @@ export default function AdminDashboard() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [approvingAdmissionId, setApprovingAdmissionId] = useState<number | null>(null);
   const [submittingReject, setSubmittingReject] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [courseTrendModalOpen, setCourseTrendModalOpen] = useState(false);
   const [selectedTrendCourse, setSelectedTrendCourse] = useState<CourseTrend | null>(null);
   const [selectedYearLevel, setSelectedYearLevel] = useState<"1st Year" | "2nd Year" | "3rd Year" | "4th Year" | null>(null);
@@ -513,6 +532,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     apiFetch("/admin/admissions")
       .then((response) => {
         if (!alive) return;
@@ -522,6 +542,9 @@ export default function AdminDashboard() {
       .catch((error) => {
         if (!alive) return;
         toast.error(error instanceof Error ? error.message : "Failed to load admissions.");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
       });
 
     return () => {
@@ -769,10 +792,13 @@ export default function AdminDashboard() {
   };
 
   const handleLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
-    toast.success("Logged out successfully.");
-    router.push("/login");
+    router.push("/");
     router.refresh();
   };
   const openEditDialog = (user: UserItem) => {
@@ -943,6 +969,16 @@ export default function AdminDashboard() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+          <AdminDashboardSkeleton />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-page min-h-screen bg-slate-50 dark:bg-transparent">
       {/* Header */}
@@ -981,7 +1017,7 @@ export default function AdminDashboard() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button onClick={() => handleNavClick("Settings")} className="nav-chip">Settings</button>
+
               <Link href="/admin/enrollments" className="nav-chip">Enrollments</Link>
             </nav>
 
@@ -1036,38 +1072,73 @@ export default function AdminDashboard() {
                 {showNotifications && !mobileMenuOpen && (
                   <div className="absolute right-0 mt-2 w-80 rounded-lg border border-slate-200 bg-neutral-50 shadow-xl z-50 dark:border-slate-700 dark:bg-slate-950">
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Inbox Messages</h3>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Latest 3 messages</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                          <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100">Messages</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} unread</p>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
-                        onClick={handleClearNotifications}
-                      >
-                        Mark all read
-                      </Button>
+                      {unreadCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                          onClick={handleClearNotifications}
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                          Mark all read
+                        </Button>
+                      )}
                     </div>
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent dark:scrollbar-thumb-slate-700 dark:scrollbar-track-slate-800/50">
                       {loadingMessages ? (
-                        <p className="p-4 text-center text-slate-600 dark:text-slate-300">Loading messages...</p>
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        </div>
                       ) : latestMessages.length === 0 ? (
-                        <p className="p-4 text-center text-slate-600 dark:text-slate-300">No messages yet.</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                            <Inbox className="h-6 w-6 text-slate-400" />
+                          </div>
+                          <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-300">No messages yet</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500">Messages will appear here</p>
+                        </div>
                       ) : (
                         latestMessages.map((msg) => (
                           <button
                             key={msg.id}
                             type="button"
-                            onClick={() => handleOpenMessage(msg.id)}
-                            className={`w-full text-left p-3 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors ${
-                              !msg.is_read ? "bg-blue-50 dark:bg-blue-950/45" : "bg-transparent"
+                            onClick={() => {
+                              setShowNotifications(false);
+                              setAllMessagesOpen(true);
+                              setSelectedMessageThread(msg);
+                            }}
+                            className={`group flex w-full items-start gap-2.5 p-3 text-left transition-colors hover:bg-slate-100 dark:hover:bg-slate-900 ${
+                              !msg.is_read ? "bg-blue-50 dark:bg-blue-950/30" : "bg-transparent"
                             }`}
                           >
-                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{msg.full_name}</p>
-                            <p className="text-xs text-blue-700 dark:text-blue-300 truncate">{msg.email}</p>
-                            <p className="text-sm text-slate-700 dark:text-slate-200 truncate mt-1">{msg.message}</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{formatRelativeTime(msg.created_at)}</p>
+                            {/* Avatar */}
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                              !msg.is_read 
+                                ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
+                                : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                            }`}>
+                              {msg.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <p className={`truncate text-xs ${!msg.is_read ? "font-semibold text-slate-900 dark:text-slate-100" : "font-medium text-slate-700 dark:text-slate-300"}`}>
+                                  {msg.full_name}
+                                </p>
+                                {!msg.is_read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />}
+                              </div>
+                              <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{msg.email}</p>
+                              <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{msg.message}</p>
+                              <p className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">{formatRelativeTime(msg.created_at)}</p>
+                            </div>
                           </button>
                         ))
                       )}
@@ -1094,6 +1165,7 @@ export default function AdminDashboard() {
                 <AvatarActionsMenu
                   initials="AD"
                   onLogout={handleLogout}
+                  onSettings={() => handleNavClick("Settings")}
                   triggerId="admin-avatar-menu-trigger"
                 />
               </div>
@@ -2086,54 +2158,128 @@ export default function AdminDashboard() {
         </div>
       </nav>
 
+      {/* Enhanced Message Preview Card */}
       {activeMessagePreview && (
-        <div className="fixed inset-x-2 bottom-20 z-[70] w-auto max-w-[calc(100vw-1rem)] rounded-xl border border-slate-300 bg-white/98 shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-[24rem] dark:border-slate-700 dark:bg-slate-950/98">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-            <div className="min-w-0">
+        <div className="fixed inset-x-2 bottom-20 z-[70] w-auto max-w-[calc(100vw-1rem)] rounded-xl border border-slate-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:w-[28rem] dark:border-slate-700 dark:bg-slate-950">
+          {/* Header with Avatar */}
+          <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-semibold text-white">
+              {activeMessagePreview.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
                 {activeMessagePreview.full_name}
               </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300 truncate">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {activeMessagePreview.email}
               </p>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-                {formatRelativeTime(activeMessagePreview.created_at)}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                  {formatRelativeTime(activeMessagePreview.created_at)}
+                </span>
+                {!activeMessagePreview.is_read && (
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    New
+                  </span>
+                )}
+              </div>
             </div>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0"
+              className="h-7 w-7 shrink-0 rounded-full"
               onClick={() => setActiveMessagePreview(null)}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="max-h-52 overflow-y-auto px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-            <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words">
+          
+          {/* Message Content */}
+          <div className="max-h-48 overflow-y-auto px-4 py-3">
+            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
               {activeMessagePreview.message}
             </p>
           </div>
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1 border-t border-slate-100 px-2 py-2 dark:border-slate-800">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => window.open(`mailto:${activeMessagePreview.email}?subject=Re: Your message to TClass&body=\n\n--- Original Message ---\nFrom: ${activeMessagePreview.full_name}\nDate: ${new Date(activeMessagePreview.created_at).toLocaleString()}\n\n${activeMessagePreview.message}`, "_blank")}
+            >
+              <Reply className="h-3.5 w-3.5" />
+              Reply
+            </Button>
+            {!activeMessagePreview.is_read && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => handleOpenMessage(activeMessagePreview.id)}
+              >
+                <MailOpen className="h-3.5 w-3.5" />
+                Mark Read
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-400 hover:text-red-500"
+              onClick={() => {
+                setActiveMessagePreview(null);
+                toast.success("Message archived");
+              }}
+            >
+              <Archive className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* More from this sender */}
           {activeSenderMessages.length > 1 && (
-            <div className="px-3 py-2">
-              <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-                More from this sender
-              </p>
-              <div className="max-h-36 overflow-y-auto space-y-1">
+            <div className="border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-50/50 dark:bg-slate-900/50">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                  {activeSenderMessages.length - 1} more from this sender
+                </p>
+              </div>
+              <div className="max-h-32 overflow-y-auto px-2 pb-2 space-y-1">
                 {activeSenderMessages
                   .filter((msg) => msg.id !== activeMessagePreview.id)
+                  .slice(0, 3)
                   .map((msg) => (
                     <button
                       key={msg.id}
                       type="button"
                       onClick={() => setActiveMessagePreview(msg)}
-                      className="w-full rounded-md border border-slate-200 px-2 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-900"
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
+                        !msg.is_read 
+                          ? "border-blue-200 bg-blue-50/50 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:hover:bg-blue-900/30" 
+                          : "border-slate-200 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                      }`}
                     >
-                      <p className="text-xs text-slate-600 dark:text-slate-400">{formatRelativeTime(msg.created_at)}</p>
-                      <p className="text-sm text-slate-800 dark:text-slate-200 truncate mt-1">{msg.message}</p>
+                      <div className="flex items-center gap-2">
+                        {!msg.is_read && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{formatRelativeTime(msg.created_at)}</p>
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-300 truncate mt-0.5">{msg.message}</p>
                     </button>
                   ))}
+                {activeSenderMessages.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMessagePreview(null);
+                      setAllMessagesOpen(true);
+                    }}
+                    className="w-full py-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    View all messages from {activeMessagePreview.full_name.split(" ")[0]} →
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -2209,48 +2355,291 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={allMessagesOpen} onOpenChange={setAllMessagesOpen}>
-        <DialogContent className="sm:max-w-2xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-slate-100">All Inbox Messages</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-300">
-              Latest messages sent from the landing page contact form.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
-            {loadingMessages ? (
-              <p className="p-4 text-center text-slate-600 dark:text-slate-300">Loading messages...</p>
-            ) : sortedMessages.length === 0 ? (
-              <p className="p-4 text-center text-slate-600 dark:text-slate-300">No messages yet.</p>
-            ) : (
-              sortedMessages.map((msg) => (
-                <button
-                  key={msg.id}
-                  type="button"
-                  onClick={() => handleOpenMessage(msg.id)}
-                  className={`w-full text-left p-3 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 ${
-                    !msg.is_read ? "bg-blue-50 dark:bg-blue-950/45" : "bg-transparent"
-                  }`}
+      {/* Enhanced Full-Featured Message Inbox Dialog */}
+      <Dialog open={allMessagesOpen} onOpenChange={(open) => {
+        setAllMessagesOpen(open);
+        if (!open) setSelectedMessageThread(null);
+      }}>
+        <DialogContent className="max-w-4xl h-[85vh] p-0 gap-0 overflow-hidden border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
+          {!selectedMessageThread ? (
+            /* Message List View */
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <Inbox className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">Messages</DialogTitle>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {sortedMessages.length} total · {unreadCount} unread
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={handleClearNotifications}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      Mark all read
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setAllMessagesOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Search and Filters */}
+              <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-700">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    placeholder="Search messages..."
+                    value={messageSearchQuery}
+                    onChange={(e) => setMessageSearchQuery(e.target.value)}
+                    className="h-9 pl-9 text-sm"
+                  />
+                </div>
+                <Select value={messageFilter} onValueChange={(v) => setMessageFilter(v as "all" | "unread" | "read")}>
+                  <SelectTrigger className="h-9 w-[110px] text-xs">
+                    <Filter className="mr-1.5 h-3.5 w-3.5" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="unread">Unread</SelectItem>
+                    <SelectItem value="read">Read</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Message List */}
+              <div className="flex-1 overflow-y-auto">
+                {loadingMessages ? (
+                  <div className="flex h-32 items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                  </div>
+                ) : sortedMessages.length === 0 ? (
+                  <div className="flex h-64 flex-col items-center justify-center text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                      <Mail className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <p className="mt-4 text-sm font-medium text-slate-900 dark:text-slate-100">No messages yet</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Messages from the contact form will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {sortedMessages
+                      .filter((msg) => {
+                        const matchesSearch = 
+                          msg.full_name.toLowerCase().includes(messageSearchQuery.toLowerCase()) ||
+                          msg.email.toLowerCase().includes(messageSearchQuery.toLowerCase()) ||
+                          msg.message.toLowerCase().includes(messageSearchQuery.toLowerCase());
+                        const matchesFilter = 
+                          messageFilter === "all" || 
+                          (messageFilter === "unread" && !msg.is_read) ||
+                          (messageFilter === "read" && msg.is_read);
+                        return matchesSearch && matchesFilter;
+                      })
+                      .map((msg) => (
+                        <button
+                          key={msg.id}
+                          type="button"
+                          onClick={() => setSelectedMessageThread(msg)}
+                          className={`group flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50 ${
+                            !msg.is_read ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
+                          }`}
+                        >
+                          {/* Avatar */}
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                            !msg.is_read 
+                              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
+                              : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                          }`}>
+                            {msg.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          
+                          {/* Content */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className={`truncate text-sm ${!msg.is_read ? "font-semibold text-slate-900 dark:text-slate-100" : "font-medium text-slate-700 dark:text-slate-300"}`}>
+                                {msg.full_name}
+                              </p>
+                              <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+                                {formatRelativeTime(msg.created_at)}
+                              </span>
+                            </div>
+                            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{msg.email}</p>
+                            <p className={`mt-1 line-clamp-2 text-sm ${!msg.is_read ? "text-slate-800 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"}`}>
+                              {msg.message}
+                            </p>
+                          </div>
+                          
+                          {/* Unread indicator */}
+                          {!msg.is_read && (
+                            <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* Message Detail View */
+            <>
+              {/* Detail Header */}
+              <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => {
+                    setSelectedMessageThread(null);
+                    handleOpenMessage(selectedMessageThread.id);
+                  }}
                 >
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{msg.full_name}</p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 truncate">{msg.email}</p>
-                  <p className="text-sm text-slate-700 dark:text-slate-200 mt-1">{msg.message}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{formatRelativeTime(msg.created_at)}</p>
-                </button>
-              ))
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClearNotifications}>
-              Mark all read
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setAllMessagesOpen(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <DialogTitle className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                    {selectedMessageThread.full_name}
+                  </DialogTitle>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedMessageThread.email}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setAllMessagesOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Message Content */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {/* Sender Info Card */}
+                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-base font-semibold text-white">
+                      {selectedMessageThread.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedMessageThread.full_name}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{selectedMessageThread.email}</p>
+                      <div className="mt-2 flex items-center gap-4 text-xs text-slate-400 dark:text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {new Date(selectedMessageThread.created_at).toLocaleString()}
+                        </span>
+                        {!selectedMessageThread.is_read && (
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            Unread
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Message Body */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                    {selectedMessageThread.message}
+                  </p>
+                </div>
+                
+                {/* Thread History */}
+                {activeSenderMessages.length > 1 && (
+                  <div className="mt-6">
+                    <h4 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      <CornerUpLeft className="h-3.5 w-3.5" />
+                      Conversation History ({activeSenderMessages.length} messages)
+                    </h4>
+                    <div className="space-y-3">
+                      {activeSenderMessages
+                        .filter((msg) => msg.id !== selectedMessageThread.id)
+                        .map((msg) => (
+                          <button
+                            key={msg.id}
+                            type="button"
+                            onClick={() => setSelectedMessageThread(msg)}
+                            className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                              !msg.is_read 
+                                ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20" 
+                                : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {formatRelativeTime(msg.created_at)}
+                              </span>
+                              {!msg.is_read && (
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                  Unread
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{msg.message}</p>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Action Footer */}
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setSelectedMessageThread(null);
+                    handleOpenMessage(selectedMessageThread.id);
+                  }}
+                >
+                  <CheckCheck className="h-4 w-4" />
+                  Mark as Read
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => window.open(`mailto:${selectedMessageThread.email}?subject=Re: Your message to TClass&body=\n\n--- Original Message ---\nFrom: ${selectedMessageThread.full_name}\nDate: ${new Date(selectedMessageThread.created_at).toLocaleString()}\n\n${selectedMessageThread.message}`, "_blank")}
+                  >
+                    <Reply className="h-4 w-4" />
+                    Reply
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20"
+                    onClick={() => {
+                      setSelectedMessageThread(null);
+                      toast.success("Message archived");
+                    }}
+                  >
+                    <Archive className="h-4 w-4" />
+                    Archive
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -2521,6 +2910,12 @@ export default function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <LogoutModal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

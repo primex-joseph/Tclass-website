@@ -1,11 +1,24 @@
 "use client";
 
 import { Toaster } from "react-hot-toast";
+import { useEffect, useState } from "react";
 
 export function ToastProvider() {
+  const [position, setPosition] = useState<"top-right" | "top-center">("top-right");
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setPosition(window.innerWidth < 640 ? "top-center" : "top-right");
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   return (
     <Toaster
-      position="top-right"
+      position={position}
       toastOptions={{
         duration: 3000,
         style: {

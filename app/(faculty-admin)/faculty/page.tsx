@@ -1,5 +1,6 @@
 "use client";
 
+import { FacultyDashboardSkeleton } from "@/components/ui/loading-states";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
+import { LogoutModal } from "@/components/ui/logout-modal";
 
 // TypeScript Types
 interface Class {
@@ -138,6 +140,10 @@ const studentValueToName: Record<string, string> = {
 export default function FacultyDashboard() {
   const pathname = usePathname();
   const router = useRouter();
+  
+  // Loading State
+  const [loading, setLoading] = useState(true);
+  
   // UI State
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -551,10 +557,16 @@ export default function FacultyDashboard() {
     }
   };
 
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+
   const handleLogout = () => {
+    setLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
-    router.push("/login");
+    router.push("/");
     router.refresh();
   };
 
@@ -593,6 +605,24 @@ export default function FacultyDashboard() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Simulate initial data loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+          <FacultyDashboardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-page faculty-page min-h-screen bg-slate-50 dark:bg-transparent">
@@ -1830,6 +1860,12 @@ export default function FacultyDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <LogoutModal
+        isOpen={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { VocationalPageSkeleton } from "@/components/ui/loading-states";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -325,8 +326,9 @@ const PROGRAM_REQUIREMENTS: Record<
 };
 
 function VocationalPageContent() {
+  const [pageLoading, setPageLoading] = useState(true);
   const searchParams = useSearchParams();
-  const selectedProgram = searchParams.get("program") ?? "";
+  const selectedProgram = searchParams.get("program") ?? ""; 
   const selectedProgramRequirements = selectedProgram ? PROGRAM_REQUIREMENTS[selectedProgram] : null;
   const [form, setForm] = useState<FormState>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -339,6 +341,11 @@ function VocationalPageContent() {
   const [validIdImageFile, setValidIdImageFile] = useState<File | null>(null);
   const [submittedModalOpen, setSubmittedModalOpen] = useState(false);
   const [isDraftReady, setIsDraftReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setPageLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -471,6 +478,16 @@ function VocationalPageContent() {
       setIsSubmitting(false);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-4 md:p-6 dark:bg-slate-950">
+        <div className="max-w-7xl mx-auto">
+          <VocationalPageSkeleton />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="vocational-page min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
