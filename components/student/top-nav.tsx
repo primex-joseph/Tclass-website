@@ -18,7 +18,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -288,7 +288,7 @@ export function StudentTopNav() {
           <div className="border-b border-slate-200 px-3 pb-3 pt-3 dark:border-white/10">
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/15 dark:bg-slate-900">
               <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
-              <ThemeToggle className="theme-toggle-inline" />
+              <ThemeIconButton />
             </div>
           </div>
 

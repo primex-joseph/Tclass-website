@@ -47,7 +47,6 @@ Open:
 
 - Landing: `http://localhost:3000`
 - Login: `http://localhost:3000/login`
-- Admission form: `http://localhost:3000/admission`
 - Vocational form: `http://localhost:3000/vocational`
 - Student enrollment page: `http://localhost:3000/student/enrollment`
 - Student portal: `http://localhost:3000/student`
@@ -74,7 +73,6 @@ npm run dev
 
 ## 8. Quick flow test
 
-1. Submit admission form with required images.
 2. Submit vocational form with at least one enrollment intention.
 3. If `Others` is selected under intention, provide the specify value.
 4. Submit contact form from landing page.

@@ -9,7 +9,6 @@ Frontend for the TClass School Management System with public landing pages and p
 - Student Portal: `http://localhost:3000/student`
 - Faculty Portal: `http://localhost:3000/faculty`
 - Admin Portal: `http://localhost:3000/admin`
-- Admission Form: `http://localhost:3000/admission`
 - Vocational Enrollment Form: `http://localhost:3000/vocational`
 
 ## Recent UI Updates

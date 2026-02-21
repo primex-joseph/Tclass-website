@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1165,7 +1165,7 @@ export default function AdminDashboard() {
             <div className="border-b border-slate-200 px-3 pb-3 pt-3 dark:border-white/10">
               <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/15 dark:bg-slate-900">
                 <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
-                <ThemeToggle className="theme-toggle-inline" />
+                <ThemeIconButton />
               </div>
             </div>
 

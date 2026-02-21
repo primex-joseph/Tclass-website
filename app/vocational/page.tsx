@@ -8,6 +8,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { submitAdmissionForm } from "@/lib/admission-submit";
 
 import { Badge } from "@/components/ui/badge";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -480,9 +481,12 @@ function VocationalPageContent() {
             <h1 className="text-3xl font-semibold text-blue-950">Learner&apos;s Profile Form</h1>
             <p className="text-slate-600 mt-1">Training Programs & Scholarships enrollment profile.</p>
           </div>
-          <Link href="/">
-            <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50">Back to Home</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeIconButton />
+            <Link href="/">
+              <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50">Back to Home</Button>
+            </Link>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

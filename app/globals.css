@@ -221,6 +221,16 @@
     caret-color: oklch(0.96 0.008 245);
     transition: background-color 9999s ease-in-out 0s;
   }
+
+  /* Keep login credentials fields dark even when browser autofill is active. */
+  .dark .login-page input:-webkit-autofill,
+  .dark .login-page input:-webkit-autofill:hover,
+  .dark .login-page input:-webkit-autofill:focus {
+    -webkit-text-fill-color: oklch(0.96 0.008 245);
+    -webkit-box-shadow: 0 0 0 1000px oklch(0.23 0.03 257 / 0.92) inset !important;
+    box-shadow: 0 0 0 1000px oklch(0.23 0.03 257 / 0.92) inset !important;
+    caret-color: oklch(0.96 0.008 245);
+  }
 }
 
 @layer components {

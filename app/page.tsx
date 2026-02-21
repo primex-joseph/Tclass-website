@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import {
@@ -12,95 +13,28 @@ import {
   ExternalLink,
   Facebook,
   GraduationCap,
-  HardHat,
-  Laptop,
+  LogIn,
   Mail,
   MapPin,
   Menu,
   Phone,
   ShieldCheck,
   Star,
-  Truck,
   Users,
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { submitContactForm } from "@/lib/contact-submit";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 
 const sectionLinks = [
   { href: "#home", label: "Home" },
   { href: "#about", label: "About" },
-  { href: "#programs", label: "Programs" },
   { href: "#news", label: "News" },
   { href: "#contact", label: "Contact" },
-] as const;
-
-const programTabs = [
-  { id: "all", label: "All Programs" },
-  { id: "heavy-equipment", label: "Heavy Equipment" },
-  { id: "ict", label: "ICT & Tech" },
-  { id: "services", label: "Services" },
-] as const;
-
-const programs = [
-  {
-    id: 1,
-    title: "Rigid Highway Dump Truck NCII",
-    category: "heavy-equipment",
-    icon: Truck,
-    description: "School-based heavy equipment training under scholarship support.",
-    duration: "3 months",
-    slots: "Limited slots",
-  },
-  {
-    id: 2,
-    title: "Transit Mixer NCII",
-    category: "heavy-equipment",
-    icon: Truck,
-    description: "Concrete mixer operation training for rapid field readiness.",
-    duration: "3 months",
-    slots: "Now accepting",
-  },
-  {
-    id: 3,
-    title: "Forklift NCII",
-    category: "heavy-equipment",
-    icon: HardHat,
-    description: "Practical forklift operation with competency assessments.",
-    duration: "2 months",
-    slots: "Open enrollment",
-  },
-  {
-    id: 4,
-    title: "3-Year Diploma in ICT",
-    category: "ict",
-    icon: Laptop,
-    description: "Full diploma pathway for digital and IT roles.",
-    duration: "3 years",
-    slots: "5 slots left",
-  },
-  {
-    id: 5,
-    title: "Housekeeping NCII",
-    category: "services",
-    icon: Award,
-    description: "Hospitality-focused housekeeping training track.",
-    duration: "2 months",
-    slots: "Now open",
-  },
-  {
-    id: 6,
-    title: "Health Care Services NCII",
-    category: "services",
-    icon: Users,
-    description: "Caregiver-assistant program aligned to TESDA standards.",
-    duration: "6 months",
-    slots: "Limited slots",
-  },
 ] as const;
 
 const newsItems = [
@@ -152,9 +86,6 @@ const steps = [
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<(typeof programTabs)[number]["id"]>(
-    "all",
-  );
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [contactForm, setContactForm] = useState({
     firstName: "",
@@ -163,14 +94,6 @@ export default function LandingPage() {
     phone: "",
     message: "",
   });
-
-  const filteredPrograms = useMemo(
-    () =>
-      activeTab === "all"
-        ? programs
-        : programs.filter((program) => program.category === activeTab),
-    [activeTab],
-  );
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
@@ -281,19 +204,17 @@ export default function LandingPage() {
                 {link.label}
               </a>
             ))}
-            <Link href="/admission" className="nav-chip">
-              Admission
-            </Link>
+
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle className="theme-toggle-inline" />
+            <ThemeIconButton />
             <Link href="/login" className="hidden sm:block">
               <Button
-                variant="outline"
                 size="sm"
-                className="border-blue-200/80 bg-white/85 dark:border-white/25 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                className="gap-2 rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700"
               >
+                <LogIn className="h-4 w-4" />
                 Login
               </Button>
             </Link>
@@ -349,11 +270,9 @@ export default function LandingPage() {
             </Button>
           </div>
 
-          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/15 dark:bg-slate-900">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
-              <ThemeToggle className="theme-toggle-inline" />
-            </div>
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/15 dark:bg-slate-900">
+            <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Theme</span>
+            <ThemeIconButton />
           </div>
 
           <div className="space-y-1.5">
@@ -367,18 +286,13 @@ export default function LandingPage() {
                 {link.label}
               </a>
             ))}
-            <Link
-              href="/admission"
-              onClick={closeMobileMenu}
-              className="block rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-            >
-              Admission
-            </Link>
+
             <Link
               href="/login"
               onClick={closeMobileMenu}
-              className="mt-3 block rounded-xl bg-blue-600 px-3 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700"
             >
+              <LogIn className="h-4 w-4" />
               Login Portal
             </Link>
           </div>
@@ -401,14 +315,19 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href="/admission" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full bg-white text-blue-900 hover:bg-blue-100 sm:w-auto">Start Admission</Button>
-                </Link>
-                <a href="#programs" className="w-full sm:w-auto">
-                  <Button size="lg" variant="outline" className="w-full border-white/65 bg-white/10 text-white hover:bg-white/20 sm:w-auto">
-                    Explore Programs
+                <Link href="/programs" className="w-full sm:w-auto">
+                  <Button 
+                    size="lg" 
+                    className="group relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-white to-blue-50 px-8 py-6 font-semibold text-blue-900 shadow-[0_8px_30px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-0.5 hover:from-blue-50 hover:to-white hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)] active:translate-y-0 dark:from-white dark:to-blue-50 dark:text-blue-900 dark:hover:from-blue-50 dark:hover:to-white sm:w-auto"
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      Enroll now
+                      <svg className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </span>
                   </Button>
-                </a>
+                </Link>
               </div>
 
               <div className="mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
@@ -427,26 +346,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <Card className="overflow-hidden border border-white/20 bg-white/12 shadow-2xl shadow-blue-950/40 backdrop-blur-md">
-              <CardContent className="space-y-4 p-6 sm:p-7">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-100">Enrollment Snapshot</p>
-                  <ShieldCheck className="h-5 w-5 text-blue-100" />
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                  <p className="text-sm text-blue-100">Current cycle</p>
-                  <p className="text-lg font-semibold text-white">Now accepting applicants</p>
-                </div>
-                <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                  <p className="text-sm text-blue-100">Top demand track</p>
-                  <p className="text-lg font-semibold text-white">Heavy Equipment NCII</p>
-                </div>
-                <Link href="/vocational" className="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-blue-100">
-                  View vocational pathways
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-              </CardContent>
-            </Card>
+
           </div>
         </section>
 
@@ -513,56 +413,10 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="programs" className="relative py-16 md:py-24">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(44,116,255,0.12),transparent_38%),radial-gradient(circle_at_90%_15%,rgba(15,160,190,0.12),transparent_36%)]" aria-hidden />
-          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="mb-10 text-center">
-              <Badge className="mb-4 bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100">Programs</Badge>
-              <h2 className="hero-title text-3xl font-bold text-blue-950 dark:text-slate-100 sm:text-4xl">Training tracks built for real career outcomes.</h2>
-              <p className="mx-auto mt-4 max-w-2xl text-sm text-slate-600 dark:text-slate-300 sm:text-base">Explore scholarship-supported options and technical pathways.</p>
-            </div>
-
-            <div className="mobile-tabs-scroll -mx-1 mb-8 flex gap-2 overflow-x-auto px-1 pb-1 sm:justify-center">
-              {programTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${activeTab === tab.id ? "bg-blue-600 text-white shadow-md shadow-blue-500/30" : "border border-blue-100 bg-white/85 text-slate-700 hover:bg-blue-50 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-white/10"}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredPrograms.map((program) => (
-                <Card key={program.id} className="elev-card group flex h-full flex-col overflow-hidden">
-                  <div className="flex h-36 items-center justify-between bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 px-5 sm:h-40">
-                    <program.icon className="h-12 w-12 text-white/90" />
-                    <Badge className="border border-white/35 bg-white/10 text-white">{program.slots}</Badge>
-                  </div>
-                  <CardContent className="flex flex-1 flex-col p-5">
-                    <h3 className="text-lg font-bold text-slate-900 transition-colors group-hover:text-blue-700 dark:text-slate-100 dark:group-hover:text-blue-200 sm:text-xl">{program.title}</h3>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{program.description}</p>
-                    <div className="mt-4 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                      <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4" />{program.duration}</span>
-                      <span className="inline-flex items-center gap-1.5"><Award className="h-4 w-4" />NCII</span>
-                    </div>
-                    <div className="mt-5 pt-2">
-                      <Link href={`/vocational?program=${encodeURIComponent(program.title)}`}><Button className="w-full">Enroll in this track</Button></Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="py-16 md:py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-10 text-center">
-              <Badge className="mb-4 bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100">Admission Flow</Badge>
+              <Badge className="mb-4 bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-100">Enrollment Flow</Badge>
               <h2 className="hero-title text-3xl font-bold text-blue-950 dark:text-slate-100 sm:text-4xl">Simple and guided from inquiry to training.</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
@@ -750,7 +604,7 @@ export default function LandingPage() {
             <div>
               <h4 className="mb-4 font-semibold text-white">Portals</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/admission" className="transition-colors hover:text-white">Admission</Link></li>
+
                 <li><Link href="/vocational" className="transition-colors hover:text-white">Vocational Programs</Link></li>
                 <li><Link href="/programs" className="transition-colors hover:text-white">Program Pages</Link></li>
                 <li><Link href="/login" className="transition-colors hover:text-white">Student Portal</Link></li>

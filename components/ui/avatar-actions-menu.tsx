@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 
 interface AvatarActionsMenuProps {
   initials: string;
@@ -81,7 +81,7 @@ export function AvatarActionsMenu({
 
         <div className="flex items-center justify-between rounded-md px-2 py-2">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Theme</span>
-          <ThemeToggle className="theme-toggle-inline" />
+          <ThemeIconButton />
         </div>
 
         <DropdownMenuSeparator className="bg-slate-200 dark:bg-white/10" />
