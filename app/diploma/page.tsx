@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { VocationalPageSkeleton } from "@/components/ui/loading-states";
@@ -485,29 +485,34 @@ function VocationalPageContent() {
   }
 
   return (
-    <main className="vocational-page min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="glass-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-4">
-          <div>
+    <main className="vocational-page min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-2.5 sm:p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6">
+        <div className="glass-panel rounded-2xl p-4 sm:p-5 md:p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
             <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Diploma Enrollment</Badge>
-            <h1 className="text-3xl font-semibold text-blue-950">Learner&apos;s Profile Form</h1>
-            <p className="text-slate-600 mt-1">College diploma enrollment profile.</p>
+            <h1 className="text-2xl sm:text-3xl font-semibold leading-tight text-blue-950">Learner&apos;s Profile Form</h1>
+            <p className="mt-1 max-w-md text-slate-600">College diploma enrollment profile.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeIconButton />
-            <Link href="/diploma-programs">
-              <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50">Back to Diploma Courses</Button>
+          <div className="grid w-full grid-cols-[2.5rem_minmax(0,1fr)] items-stretch gap-2 md:flex md:w-auto md:items-center md:justify-end">
+            <ThemeIconButton className="h-10 w-10 rounded-xl" />
+            <Link href="/diploma-programs" className="min-w-0">
+              <Button
+                variant="outline"
+                className="h-10 w-full justify-center rounded-xl border-blue-200 px-3 text-center text-blue-800 hover:bg-blue-50 md:w-auto md:whitespace-nowrap"
+              >
+                Back to Diploma Courses
+              </Button>
             </Link>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 pb-24 sm:space-y-6 sm:pb-0">
           <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
-              <CardTitle className="text-blue-900">Required Supporting Documents</CardTitle>
+              <CardTitle className="text-xl leading-tight text-blue-900 sm:text-2xl">Required Supporting Documents</CardTitle>
               <CardDescription>These are required for diploma enrollment.</CardDescription>
             </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
+            <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <FileUploadField
                   label="Birth Certificate (Image or PDF)"
@@ -520,7 +525,7 @@ function VocationalPageContent() {
               <div className="space-y-2">
                 <Label>Valid ID Type</Label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white/85 px-3 text-sm text-slate-800 shadow-sm outline-none ring-0 transition focus:border-blue-300 focus:ring-2 focus:ring-blue-200/60"
                   value={validIdType}
                   onChange={(e) => {
                     setValidIdType(e.target.value);
@@ -685,7 +690,7 @@ function VocationalPageContent() {
                   <Label>Sex</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {["Male", "Female"].map((item) => (
-                      <label key={item} className="flex items-center gap-2 text-sm">
+                      <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                         <input type="radio" name="sex" checked={form.sex === item} onChange={() => setForm((prev) => ({ ...prev, sex: item }))} />
                         {item}
                       </label>
@@ -696,7 +701,7 @@ function VocationalPageContent() {
                   <Label>Civil Status</Label>
                   <div className="space-y-1">
                     {civilStatuses.map((item) => (
-                      <label key={item} className="flex items-center gap-2 text-sm">
+                      <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                         <input type="checkbox" checked={form.civilStatus.includes(item)} onChange={() => toggleArrayValue("civilStatus", item)} />
                         {item}
                       </label>
@@ -707,7 +712,7 @@ function VocationalPageContent() {
                   <Label>Employment Status (before training)</Label>
                   <div className="space-y-1">
                     {employmentStatuses.map((item) => (
-                      <label key={item} className="flex items-center gap-2 text-sm">
+                      <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                         <input type="radio" name="employment" checked={form.employmentStatus === item} onChange={() => setForm((prev) => ({ ...prev, employmentStatus: item }))} />
                         {item}
                       </label>
@@ -754,7 +759,7 @@ function VocationalPageContent() {
                 <Label>Educational Attainment Before the Training (Trainee)</Label>
                 <div className="grid md:grid-cols-3 gap-2">
                   {educationalAttainments.map((item) => (
-                    <label key={item} className="flex items-center gap-2 text-sm">
+                    <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                       <input type="checkbox" checked={form.educationalAttainment.includes(item)} onChange={() => toggleArrayValue("educationalAttainment", item)} />
                       {item}
                     </label>
@@ -790,7 +795,7 @@ function VocationalPageContent() {
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-2">
                 {learnerClassifications.map((item) => (
-                  <label key={item} className="flex items-center gap-2 text-sm">
+                  <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                     <input type="checkbox" checked={form.learnerClassifications.includes(item)} onChange={() => toggleArrayValue("learnerClassifications", item)} />
                     {item}
                   </label>
@@ -811,7 +816,7 @@ function VocationalPageContent() {
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-2">
                 {disabilityTypes.map((item) => (
-                  <label key={item} className="flex items-center gap-2 text-sm">
+                  <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                     <input type="checkbox" checked={form.disabilityTypes.includes(item)} onChange={() => toggleArrayValue("disabilityTypes", item)} />
                     {item}
                   </label>
@@ -831,7 +836,7 @@ function VocationalPageContent() {
             </CardHeader>
             <CardContent className="grid md:grid-cols-3 gap-2">
               {disabilityCauses.map((item) => (
-                <label key={item} className="flex items-center gap-2 text-sm">
+                <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                   <input type="checkbox" checked={form.disabilityCauses.includes(item)} onChange={() => toggleArrayValue("disabilityCauses", item)} />
                   {item}
                 </label>
@@ -866,12 +871,12 @@ function VocationalPageContent() {
                 I hereby allow TESDA to use/post my contact details, name, email, cellphone/landline nos. and other information I provided
                 which may be used for processing of my scholarship application, for employment opportunities and for the survey of TESDA programs.
               </p>
-              <div className="flex items-center gap-8">
-                <label className="flex items-center gap-2 text-sm">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-8">
+                <label className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                   <input type="radio" name="privacyConsent" checked={form.privacyConsent === "agree"} onChange={() => setForm((prev) => ({ ...prev, privacyConsent: "agree" }))} />
                   Agree
                 </label>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
                   <input type="radio" name="privacyConsent" checked={form.privacyConsent === "disagree"} onChange={() => setForm((prev) => ({ ...prev, privacyConsent: "disagree" }))} />
                   Disagree
                 </label>
@@ -916,8 +921,8 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <div className="flex items-center gap-3">
-            <Button type="submit" disabled={isSubmitting}>
+          <div className="sticky bottom-2 z-20 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-white/90 p-2 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/75 dark:border-white/10 dark:bg-slate-900/85 sm:static sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none sm:supports-[backdrop-filter]:bg-transparent sm:flex-row sm:items-center">
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -927,7 +932,7 @@ function VocationalPageContent() {
                 "Save Diploma Enrollment"
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setForm(defaultForm)}>
+            <Button type="button" variant="outline" onClick={() => setForm(defaultForm)} className="w-full sm:w-auto">
               Reset
             </Button>
           </div>
@@ -996,4 +1001,6 @@ export default function VocationalPage() {
     </Suspense>
   );
 }
+
+
 

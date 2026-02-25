@@ -47,21 +47,21 @@ export function FileUploadField({
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm transition dark:border-white/10 dark:bg-slate-900/60">
+      <div className="rounded-xl border border-slate-200 bg-white/85 p-2.5 shadow-sm transition dark:border-white/10 dark:bg-slate-900/60 sm:rounded-2xl sm:p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/90 px-3 py-3 text-left transition hover:border-blue-400 hover:bg-blue-50/60 dark:border-white/15 dark:bg-white/5 dark:hover:border-blue-400/50 dark:hover:bg-blue-500/10"
+            className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50/90 px-2.5 py-2.5 text-left transition hover:border-blue-400 hover:bg-blue-50/60 dark:border-white/15 dark:bg-white/5 dark:hover:border-blue-400/50 dark:hover:bg-blue-500/10 sm:rounded-xl sm:px-3 sm:py-3"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 sm:rounded-xl">
               {isImage ? <ImageIcon className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 leading-tight">
               <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
                 {file ? "Change file" : "Choose file"}
               </span>
-              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+              <span className="block text-xs text-slate-500 dark:text-slate-400 sm:truncate">
                 {file ? file.name : helperText}
               </span>
             </span>
@@ -93,9 +93,11 @@ export function FileUploadField({
         </div>
       </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-400">
-        {file ? `Selected: ${file.name}` : helperText}
-      </p>
+      {file ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {`Selected: ${file.name}`}
+        </p>
+      ) : null}
     </div>
   );
 }
