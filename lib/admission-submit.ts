@@ -1,5 +1,3 @@
-import { getCookieValue } from "@/lib/api-client";
-
 type AdmissionSubmitInput = {
   fullName: string;
   age: number;
@@ -27,7 +25,6 @@ export async function submitAdmissionForm(input: AdmissionSubmitInput) {
     throw new Error("Missing NEXT_PUBLIC_API_BASE_URL");
   }
 
-  const token = getCookieValue("tclass_token");
   const body = new FormData();
   body.append("full_name", input.fullName);
   body.append("age", String(input.age));
@@ -55,7 +52,9 @@ export async function submitAdmissionForm(input: AdmissionSubmitInput) {
 
   const response = await fetch(`${baseUrl}/admission/submit`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: {
+      Accept: "application/json",
+    },
     body,
   });
 

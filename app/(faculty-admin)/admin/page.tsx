@@ -140,6 +140,7 @@ interface AdmissionApplication {
   application_type?: "admission" | "vocational";
   valid_id_type?: string | null;
   status: "pending" | "approved" | "rejected";
+  exam_status?: "passed" | "failed" | "not_attended";
   created_user_id: number | null;
   remarks?: string | null;
   id_picture_path?: string | null;
@@ -147,7 +148,22 @@ interface AdmissionApplication {
   right_thumbmark_path?: string | null;
   birth_certificate_path?: string | null;
   valid_id_path?: string | null;
+  exam_schedule_sent_at?: string | null;
+  exam_schedule_payload?: {
+    subject?: string;
+    intro_message?: string;
+    exam_date?: string;
+    exam_time?: string;
+    exam_day?: string;
+    location?: string;
+    things_to_bring?: string;
+    attire_note?: string | null;
+    additional_note?: string | null;
+  } | null;
 }
+
+type ExamStatus = "passed" | "failed" | "not_attended";
+type AdmissionType = "admission" | "vocational";
 
 interface DashboardStats {
   students: number;
@@ -360,6 +376,24 @@ export default function AdminDashboard() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [approvingAdmissionId, setApprovingAdmissionId] = useState<number | null>(null);
   const [submittingReject, setSubmittingReject] = useState(false);
+  const [masterlistOpen, setMasterlistOpen] = useState(false);
+  const [masterlistType, setMasterlistType] = useState<AdmissionType>("vocational");
+  const [masterlistCourseFilter, setMasterlistCourseFilter] = useState<string>("all");
+  const [updatingExamStatusId, setUpdatingExamStatusId] = useState<number | null>(null);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleTarget, setScheduleTarget] = useState<AdmissionApplication | null>(null);
+  const [sendingSchedule, setSendingSchedule] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    subject: "Entrance Exam Schedule Invitation - TCLASS",
+    intro_message: "You have been invited to take the entrance examination for your application at TCLASS. Please review the schedule details below and arrive on time.",
+    exam_date: "",
+    exam_time: "",
+    exam_day: "",
+    location: "TCLASS Campus / Admissions Office",
+    things_to_bring: "1. Valid ID\n2. Ballpen (black or blue)\n3. Printed/phone copy of this email invitation",
+    attire_note: "Please wear proper attire. Avoid sleeveless tops, shorts, and slippers.",
+    additional_note: "",
+  });
   const [loading, setLoading] = useState(true);
   const [courseTrendModalOpen, setCourseTrendModalOpen] = useState(false);
   const [selectedTrendCourse, setSelectedTrendCourse] = useState<CourseTrend | null>(null);
@@ -813,6 +847,13 @@ export default function AdminDashboard() {
 
   const pendingAdmissions = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "admission");
   const pendingVocationals = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "vocational");
+  const masterlistRows = admissions.filter((item) => (item.application_type ?? "admission") === masterlistType);
+  const masterlistCourses = Array.from(new Set(masterlistRows.map((item) => item.primary_course).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const filteredMasterlistRows = masterlistRows.filter((item) =>
+    masterlistCourseFilter === "all" ? true : item.primary_course === masterlistCourseFilter
+  );
   const universalTerm = universalSearchQuery.trim().toLowerCase();
   const matchedUsers = universalTerm
     ? users
@@ -966,6 +1007,90 @@ export default function AdminDashboard() {
       toast.error(error instanceof Error ? error.message : "Failed to reject admission.");
     } finally {
       setSubmittingReject(false);
+    }
+  };
+
+  const openMasterlist = (type: AdmissionType) => {
+    setMasterlistType(type);
+    setMasterlistCourseFilter("all");
+    setMasterlistOpen(true);
+  };
+
+  const openScheduleModal = (application: AdmissionApplication) => {
+    const payload = application.exam_schedule_payload ?? {};
+    setScheduleTarget(application);
+    setScheduleForm({
+      subject: payload.subject || "Entrance Exam Schedule Invitation - TCLASS",
+      intro_message:
+        payload.intro_message ||
+        "You have been invited to take the entrance examination for your application at TCLASS. Please review the schedule details below and arrive on time.",
+      exam_date: payload.exam_date || "",
+      exam_time: payload.exam_time || "",
+      exam_day: payload.exam_day || "",
+      location: payload.location || "TCLASS Campus / Admissions Office",
+      things_to_bring:
+        payload.things_to_bring ||
+        "1. Valid ID\n2. Ballpen (black or blue)\n3. Printed/phone copy of this email invitation",
+      attire_note:
+        payload.attire_note ||
+        "Please wear proper attire. Avoid sleeveless tops, shorts, and slippers.",
+      additional_note: payload.additional_note || "",
+    });
+    setScheduleModalOpen(true);
+  };
+
+  const handleSendExamSchedule = async () => {
+    if (!scheduleTarget) return;
+    if (!scheduleForm.exam_date.trim() || !scheduleForm.exam_time.trim() || !scheduleForm.exam_day.trim()) {
+      toast.error("Please provide the exam date, time, and day.");
+      return;
+    }
+    if (!scheduleForm.location.trim() || !scheduleForm.things_to_bring.trim()) {
+      toast.error("Please complete the location and things-to-bring fields.");
+      return;
+    }
+
+    setSendingSchedule(true);
+    try {
+      const response = await apiFetch(`/admin/admissions/${scheduleTarget.id}/send-exam-schedule`, {
+        method: "POST",
+        body: JSON.stringify({
+          ...scheduleForm,
+          subject: scheduleForm.subject.trim(),
+          intro_message: scheduleForm.intro_message.trim(),
+          exam_date: scheduleForm.exam_date.trim(),
+          exam_time: scheduleForm.exam_time.trim(),
+          exam_day: scheduleForm.exam_day.trim(),
+          location: scheduleForm.location.trim(),
+          things_to_bring: scheduleForm.things_to_bring.trim(),
+          attire_note: scheduleForm.attire_note.trim() || null,
+          additional_note: scheduleForm.additional_note.trim() || null,
+        }),
+      });
+      toast.success((response as { message?: string }).message ?? "Exam schedule sent.");
+      setScheduleModalOpen(false);
+      setScheduleTarget(null);
+      await loadAdmissions();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send exam schedule.");
+    } finally {
+      setSendingSchedule(false);
+    }
+  };
+
+  const handleUpdateExamStatus = async (id: number, examStatus: ExamStatus) => {
+    setUpdatingExamStatusId(id);
+    try {
+      await apiFetch(`/admin/admissions/${id}/exam-status`, {
+        method: "PATCH",
+        body: JSON.stringify({ exam_status: examStatus }),
+      });
+      setAdmissions((prev) => prev.map((row) => (row.id === id ? { ...row, exam_status: examStatus } : row)));
+      toast.success("Exam status updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update exam status.");
+    } finally {
+      setUpdatingExamStatusId(null);
     }
   };
 
@@ -1863,8 +1988,22 @@ export default function AdminDashboard() {
 <TabsContent value="admissions" className="mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Admission Applications</CardTitle>
-                    <CardDescription>Verify first-time enrollment requests, then approve or reject.</CardDescription>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <CardTitle>Admission Applications</CardTitle>
+                        <CardDescription>Verify first-time enrollment requests, then approve or reject.</CardDescription>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 self-start"
+                        onClick={() => openMasterlist("admission")}
+                      >
+                        <Users className="h-4 w-4" />
+                        View List
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {pendingAdmissions.length === 0 ? (
@@ -1895,6 +2034,15 @@ export default function AdminDashboard() {
                               </p>
                             </div>
                             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                              <Button
+                                size="sm"
+                                type="button"
+                                className="w-full bg-sky-100 text-sky-700 hover:bg-sky-200 sm:w-auto"
+                                onClick={() => openScheduleModal(item)}
+                                disabled={approvingAdmissionId === item.id || submittingReject}
+                              >
+                                Send a Schedule
+                              </Button>
                               <Button
                                 size="sm"
                                 className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
@@ -1943,8 +2091,22 @@ export default function AdminDashboard() {
               <TabsContent value="vocationals" className="mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Vocational Enrollees</CardTitle>
-                    <CardDescription>Review Training Programs & Scholarships enrollment applications.</CardDescription>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <CardTitle>Vocational Enrollees</CardTitle>
+                        <CardDescription>Review Training Programs & Scholarships enrollment applications.</CardDescription>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 self-start"
+                        onClick={() => openMasterlist("vocational")}
+                      >
+                        <Users className="h-4 w-4" />
+                        View List
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {pendingVocationals.length === 0 ? (
@@ -1982,6 +2144,15 @@ export default function AdminDashboard() {
                               </p>
                             </div>
                             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                              <Button
+                                size="sm"
+                                type="button"
+                                className="w-full bg-sky-100 text-sky-700 hover:bg-sky-200 sm:w-auto"
+                                onClick={() => openScheduleModal(item)}
+                                disabled={approvingAdmissionId === item.id || submittingReject}
+                              >
+                                Send a Schedule
+                              </Button>
                               <Button
                                 size="sm"
                                 className="w-full bg-green-600 hover:bg-green-700 sm:w-auto"
@@ -2870,6 +3041,195 @@ export default function AdminDashboard() {
             <Button variant="destructive" onClick={handleDeleteUser}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={masterlistOpen} onOpenChange={setMasterlistOpen}>
+        <DialogContent className="flex h-[80vh] w-[calc(100vw-2rem)] max-w-[min(92vw,1320px)] flex-col border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">
+              {masterlistType === "vocational" ? "Certificate" : "Diploma"} Masterlist
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Students who submitted forms. Filter by course and update entrance exam result status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Form Type</Label>
+              <Select value={masterlistType} onValueChange={(v) => setMasterlistType(v as AdmissionType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vocational">Certificate</SelectItem>
+                  <SelectItem value="admission">Diploma</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Course Filter</Label>
+              <Select value={masterlistCourseFilter} onValueChange={setMasterlistCourseFilter}>
+                <SelectTrigger><SelectValue placeholder="All courses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Courses</SelectItem>
+                  {masterlistCourses.map((course) => (
+                    <SelectItem key={course} value={course}>{course}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Course</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Admission Status</TableHead>
+                  <TableHead>Exam Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMasterlistRows.map((item) => (
+                  <TableRow key={`master-${item.id}`}>
+                    <TableCell className="min-w-[180px] font-medium">{item.full_name}</TableCell>
+                    <TableCell className="min-w-[210px]">{item.primary_course}</TableCell>
+                    <TableCell className="min-w-[230px] text-xs sm:text-sm">{item.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={item.exam_status ?? "not_attended"}
+                        onValueChange={(value) => handleUpdateExamStatus(item.id, value as ExamStatus)}
+                        disabled={updatingExamStatusId === item.id}
+                      >
+                        <SelectTrigger className="w-[160px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="passed">Passed</SelectItem>
+                          <SelectItem value="failed">Failed</SelectItem>
+                          <SelectItem value="not_attended">Not Attended</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredMasterlistRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-8 text-center text-slate-500">
+                      No submitted forms found for this filter.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMasterlistOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={scheduleModalOpen}
+        onOpenChange={(open) => {
+          setScheduleModalOpen(open);
+          if (!open) setScheduleTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Send Entrance Exam Schedule</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-300">
+              Compose and send an exam invitation email to {scheduleTarget?.full_name ?? "the applicant"} ({scheduleTarget?.email ?? "-"}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[65vh] space-y-4 overflow-auto pr-1">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="exam-subject">Email Subject</Label>
+                <Input id="exam-subject" value={scheduleForm.subject} onChange={(e) => setScheduleForm((p) => ({ ...p, subject: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="exam-intro">Intro Message</Label>
+                <Textarea
+                  id="exam-intro"
+                  rows={3}
+                  value={scheduleForm.intro_message}
+                  onChange={(e) => setScheduleForm((p) => ({ ...p, intro_message: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="exam-date">Date</Label>
+                <Input id="exam-date" type="date" value={scheduleForm.exam_date} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="exam-time">Time</Label>
+                <Input id="exam-time" type="time" value={scheduleForm.exam_time} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_time: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="exam-day">Day</Label>
+                <Input id="exam-day" placeholder="e.g. Monday" value={scheduleForm.exam_day} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_day: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="exam-location">Where</Label>
+                <Input id="exam-location" value={scheduleForm.location} onChange={(e) => setScheduleForm((p) => ({ ...p, location: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="exam-bring">Things to Bring</Label>
+                <Textarea
+                  id="exam-bring"
+                  rows={4}
+                  value={scheduleForm.things_to_bring}
+                  onChange={(e) => setScheduleForm((p) => ({ ...p, things_to_bring: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="exam-attire">Note (Proper Attire)</Label>
+                <Textarea
+                  id="exam-attire"
+                  rows={2}
+                  value={scheduleForm.attire_note}
+                  onChange={(e) => setScheduleForm((p) => ({ ...p, attire_note: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="exam-note">Additional Note (Optional)</Label>
+                <Textarea
+                  id="exam-note"
+                  rows={2}
+                  value={scheduleForm.additional_note}
+                  onChange={(e) => setScheduleForm((p) => ({ ...p, additional_note: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setScheduleModalOpen(false)} disabled={sendingSchedule}>
+              Cancel
+            </Button>
+            <Button className="bg-sky-600 hover:bg-sky-700" onClick={handleSendExamSchedule} disabled={sendingSchedule}>
+              {sendingSchedule ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send a Schedule"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -184,7 +184,7 @@ const defaultForm: FormState = {
   rightThumbmarkNote: "",
 };
 
-const VOCATIONAL_DRAFT_KEY = "tclass_vocational_form_draft_v1";
+const DIPLOMA_DRAFT_KEY = "tclass_diploma_form_draft_v1";
 const PH_VALID_IDS = [
   "PhilSys National ID",
   "Passport",
@@ -331,7 +331,6 @@ function VocationalPageContent() {
   const [pageLoading, setPageLoading] = useState(true);
   const searchParams = useSearchParams();
   const selectedProgram = searchParams.get("program") ?? ""; 
-  const selectedProgramRequirements = selectedProgram ? PROGRAM_REQUIREMENTS[selectedProgram] : null;
   const [form, setForm] = useState<FormState>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [idPictureFile, setIdPictureFile] = useState<File | null>(null);
@@ -369,7 +368,7 @@ function VocationalPageContent() {
     if (typeof window === "undefined") return;
 
     try {
-      const saved = window.localStorage.getItem(VOCATIONAL_DRAFT_KEY);
+      const saved = window.localStorage.getItem(DIPLOMA_DRAFT_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved) as Partial<FormState> & { validIdType?: string; validIdTypeOther?: string };
       setForm((prev) => ({ ...prev, ...parsed }));
@@ -389,7 +388,7 @@ function VocationalPageContent() {
     if (typeof window === "undefined") return;
     if (!isDraftReady) return;
     try {
-      window.localStorage.setItem(VOCATIONAL_DRAFT_KEY, JSON.stringify({ ...form, validIdType, validIdTypeOther }));
+      window.localStorage.setItem(DIPLOMA_DRAFT_KEY, JSON.stringify({ ...form, validIdType, validIdTypeOther }));
     } catch {
       // Ignore storage failures.
     }
@@ -424,19 +423,10 @@ function VocationalPageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Temporary relaxed validation for easier mailer testing with partial form input.
-    if (form.age.trim() && (!Number.isFinite(Number(form.age)) || Number(form.age) < 18)) {
-      toast.error("For certificate enrollment, age must be 18 and above.");
-      return;
-    }
     if (validIdType === "Others" && !validIdTypeOther.trim()) {
       toast.error("Please specify the valid ID type for Others.");
       return;
     }
-    if (form.enrollmentPurposes.includes("Others") && !form.enrollmentPurposeOthers.trim()) {
-      toast.error("Please specify the purpose under Others.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const fullName = [form.firstName, form.middleName, form.lastName, form.extensionName]
@@ -450,7 +440,7 @@ function VocationalPageContent() {
         primaryCourse: form.courseQualificationName,
         secondaryCourse: form.scholarshipType || null,
         email: form.emailAddress,
-        applicationType: "vocational",
+        applicationType: "admission",
         validIdType: validIdType === "Others" ? `Others - ${validIdTypeOther.trim()}` : validIdType,
         facebookAccount: form.facebookAccount || null,
         contactNo: form.contactNo || null,
@@ -464,7 +454,7 @@ function VocationalPageContent() {
         validIdImageFile,
       });
 
-      toast.success((response as { message?: string }).message ?? "Vocational enrollment submitted successfully.");
+      toast.success((response as { message?: string }).message ?? "Diploma enrollment submitted successfully.");
       setForm(defaultForm);
       setIdPictureFile(null);
       setOneByOnePictureFile(null);
@@ -475,7 +465,7 @@ function VocationalPageContent() {
       setValidIdImageFile(null);
       setSubmittedModalOpen(true);
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(VOCATIONAL_DRAFT_KEY);
+        window.localStorage.removeItem(DIPLOMA_DRAFT_KEY);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to submit admission.");
@@ -499,50 +489,23 @@ function VocationalPageContent() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="glass-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-4">
           <div>
-            <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Vocational Enrollment</Badge>
+            <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Diploma Enrollment</Badge>
             <h1 className="text-3xl font-semibold text-blue-950">Learner&apos;s Profile Form</h1>
-            <p className="text-slate-600 mt-1">Training Programs & Scholarships enrollment profile.</p>
+            <p className="text-slate-600 mt-1">College diploma enrollment profile.</p>
           </div>
           <div className="flex items-center gap-2">
             <ThemeIconButton />
-            <Link href="/programs">
-              <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50">Back to Training Programs</Button>
+            <Link href="/diploma-programs">
+              <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50">Back to Diploma Courses</Button>
             </Link>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
-          {selectedProgramRequirements && (
-            <Card className="elev-card border-blue-100/80 bg-white/90">
-              <CardHeader>
-                <CardTitle className="text-blue-900">Program Requirements: {selectedProgram}</CardTitle>
-                <CardDescription>Please review these before submitting your registration.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold text-slate-900 mb-2">Documentary Requirements</h3>
-                  <ul className="space-y-1 text-sm text-slate-700 list-disc pl-5">
-                    {selectedProgramRequirements.documentaryRequirements.map((item, index) => (
-                      <li key={`document-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900 mb-2">Qualifications</h3>
-                  <ul className="space-y-1 text-sm text-slate-700 list-disc pl-5">
-                    {selectedProgramRequirements.qualifications.map((item, index) => (
-                      <li key={`qualification-${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-blue-900">Required Supporting Documents</CardTitle>
-              <CardDescription>These are required for Training Programs & Scholarships enrollment.</CardDescription>
+              <CardDescription>These are required for diploma enrollment.</CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -768,12 +731,7 @@ function VocationalPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label>Age</Label>
-                  <Input
-                    type="number"
-                    min={18}
-                    value={form.age}
-                    onChange={(e) => setForm((prev) => ({ ...prev, age: e.target.value }))}
-                  />
+                  <Input value={form.age} onChange={(e) => setForm((prev) => ({ ...prev, age: e.target.value }))} />
                 </div>
               </div>
 
@@ -958,41 +916,6 @@ function VocationalPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="elev-card border-blue-100/80 bg-white/90">
-            <CardHeader>
-              <CardTitle className="text-blue-900">11. Purpose/s and/or Intention for Enrolling</CardTitle>
-              <CardDescription>Please check the appropriate box below.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid md:grid-cols-2 gap-2">
-                {enrollmentPurposes.map((item) => (
-                  <label key={item} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.enrollmentPurposes.includes(item)}
-                      onChange={() => {
-                        toggleArrayValue("enrollmentPurposes", item);
-                        if (item === "Others" && form.enrollmentPurposes.includes("Others")) {
-                          setForm((prev) => ({ ...prev, enrollmentPurposeOthers: "" }));
-                        }
-                      }}
-                    />
-                    {item}
-                  </label>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Others, please specify</Label>
-                <Input
-                  value={form.enrollmentPurposeOthers}
-                  onChange={(e) => setForm((prev) => ({ ...prev, enrollmentPurposeOthers: e.target.value }))}
-                  disabled={!form.enrollmentPurposes.includes("Others")}
-                  placeholder="Type your specific intention"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
@@ -1001,7 +924,7 @@ function VocationalPageContent() {
                   Submitting...
                 </>
               ) : (
-                "Save Vocational Enrollment"
+                "Save Diploma Enrollment"
               )}
             </Button>
             <Button type="button" variant="outline" onClick={() => setForm(defaultForm)}>
@@ -1027,7 +950,7 @@ function VocationalPageContent() {
                       Enrollment Submitted
                     </DialogTitle>
                     <DialogDescription className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300 sm:text-base">
-                      Thank you for registering for <span className="font-semibold text-slate-800 dark:text-slate-100">Training Programs & Scholarships</span>.
+                      Thank you for registering for <span className="font-semibold text-slate-800 dark:text-slate-100">College Diploma Enrollment</span>.
                       Please wait for admin approval on your email.
                     </DialogDescription>
                   </div>
@@ -1054,8 +977,8 @@ function VocationalPageContent() {
                 <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSubmittedModalOpen(false)}>
                   Close
                 </Button>
-                <Link href="/" className="w-full sm:w-auto">
-                  <Button className="w-full sm:w-auto">Back to Home</Button>
+                <Link href="/diploma-programs" className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto">Back to Diploma Courses</Button>
                 </Link>
               </DialogFooter>
             </div>

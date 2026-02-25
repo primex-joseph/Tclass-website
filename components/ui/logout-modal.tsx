@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogOut, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,10 +28,16 @@ export function LogoutModal({
 }: LogoutModalProps) {
   const [progress, setProgress] = useState(100);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const rafIdRef = useRef<number | null>(null);
+  const confirmedRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen || !isLoggingOut) {
       setProgress(100);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       return;
     }
 
@@ -39,40 +45,65 @@ export function LogoutModal({
     const duration = LOGOUT_DURATION;
 
     const updateProgress = () => {
+      if (!isOpen || !isLoggingOut || confirmedRef.current) return;
+
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
       setProgress(remaining);
 
       if (remaining > 0) {
-        requestAnimationFrame(updateProgress);
+        rafIdRef.current = requestAnimationFrame(updateProgress);
       } else {
-        // Logout complete
+        confirmedRef.current = true;
+        rafIdRef.current = null;
         onConfirm();
       }
     };
 
-    const animationFrame = requestAnimationFrame(updateProgress);
+    rafIdRef.current = requestAnimationFrame(updateProgress);
 
     return () => {
-      cancelAnimationFrame(animationFrame);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
   }, [isOpen, isLoggingOut, onConfirm]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
+      confirmedRef.current = false;
       setProgress(100);
       setIsLoggingOut(true);
     } else {
+      confirmedRef.current = false;
       setProgress(100);
       setIsLoggingOut(false);
     }
   }, [isOpen]);
 
   const handleCancel = () => {
+    confirmedRef.current = true;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
     setIsLoggingOut(false);
     setProgress(100);
     onClose();
+  };
+
+  const handleConfirmNow = () => {
+    if (confirmedRef.current) return;
+    confirmedRef.current = true;
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    setIsLoggingOut(false);
+    setProgress(0);
+    onConfirm();
   };
 
   return (
@@ -113,10 +144,7 @@ export function LogoutModal({
             </Button>
             <Button
               className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800"
-              onClick={() => {
-                setProgress(0);
-                onConfirm();
-              }}
+              onClick={handleConfirmNow}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Logout Now
