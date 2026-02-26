@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, LogOut, Menu, Monitor, Moon, Search, Settings, Sun, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -303,9 +303,15 @@ function ProfileDropdown({
   );
 }
 
-export default function StudentShell() {
+export default function StudentShell({
+  initialSection = "home",
+  customSectionContent,
+}: {
+  initialSection?: Section;
+  customSectionContent?: Partial<Record<Section, ReactNode>>;
+} = {}) {
   const router = useRouter();
-  const [active, setActive] = useState<Section>("home");
+  const [active, setActive] = useState<Section>(initialSection);
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -317,6 +323,13 @@ export default function StudentShell() {
     const t = window.setTimeout(() => setLoading(false), 850);
     return () => window.clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    setActive(initialSection);
+    if (initialSection === "student-enrollment") {
+      setExpanded((prev) => new Set(prev).add("Online Services"));
+    }
+  }, [initialSection]);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -353,6 +366,12 @@ export default function StudentShell() {
     : null;
 
   const select = (section: Section) => {
+    if (section === "student-enrollment") {
+      setActive(section);
+      setMobileOpen(false);
+      router.push("/student/enrollment");
+      return;
+    }
     setActive(section);
     setMobileOpen(false);
   };
@@ -497,7 +516,7 @@ export default function StudentShell() {
                       Search matches in navigation: <span className="font-semibold">{searchMatches}</span>
                     </div>
                   ) : null}
-                  <SectionContent section={active} />
+                  {customSectionContent?.[active] ?? <SectionContent section={active} />}
                 </div>
               )}
             </main>

@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 type Period = { id: number; name: string; is_active: number };
 type Enrollment = {
   id: number;
+  student_id?: number;
   status: "draft" | "unofficial" | "official" | "rejected" | "dropped";
   remarks: string | null;
   requested_at: string | null;
@@ -43,18 +44,29 @@ type Enrollment = {
   period_name: string | null;
 };
 
+type EnrollmentGroup = {
+  key: string;
+  studentName: string;
+  studentEmail: string;
+  periodName: string | null;
+  status: Enrollment["status"];
+  assessedAt: string | null;
+  rows: Enrollment[];
+  totalUnits: number;
+};
+
 function statusBadgeClass(status: Enrollment["status"]) {
   switch (status) {
     case "official":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+      return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
     case "rejected":
-      return "border-red-500/30 bg-red-500/10 text-red-300";
+      return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
     case "unofficial":
-      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+      return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
     case "draft":
-      return "border-slate-400/20 bg-slate-400/10 text-slate-300";
+      return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-400/20 dark:bg-slate-400/10 dark:text-slate-300";
     default:
-      return "border-blue-500/30 bg-blue-500/10 text-blue-300";
+      return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300";
   }
 }
 
@@ -64,7 +76,7 @@ export default function AdminEnrollmentsPage() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [rows, setRows] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [remarks, setRemarks] = useState<Record<number, string>>({});
+  const [groupRemarks, setGroupRemarks] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<string>("unofficial");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,6 +89,44 @@ export default function AdminEnrollmentsPage() {
   }, []);
 
   const activePeriodId = useMemo(() => periods.find((p) => p.is_active)?.id, [periods]);
+  const groupedRows = useMemo<EnrollmentGroup[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? rows.filter((row) =>
+          [row.student_name, row.student_email, row.course_code, row.course_title, row.period_name ?? "", row.status]
+            .join(" ")
+            .toLowerCase()
+            .includes(q)
+        )
+      : rows;
+
+    const map = new Map<string, EnrollmentGroup>();
+    for (const row of filtered) {
+      const key = `${row.student_id ?? row.student_email}|${row.period_id ?? "none"}|${row.status}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.rows.push(row);
+        existing.totalUnits += Number(row.units ?? 0);
+        if (!existing.assessedAt && row.assessed_at) existing.assessedAt = row.assessed_at;
+        continue;
+      }
+      map.set(key, {
+        key,
+        studentName: row.student_name,
+        studentEmail: row.student_email,
+        periodName: row.period_name ?? null,
+        status: row.status,
+        assessedAt: row.assessed_at,
+        rows: [row],
+        totalUnits: Number(row.units ?? 0),
+      });
+    }
+
+    return [...map.values()].map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((a, b) => a.course_code.localeCompare(b.course_code)),
+    }));
+  }, [rows, searchQuery]);
 
   const loadData = useCallback(async () => {
     try {
@@ -100,14 +150,18 @@ export default function AdminEnrollmentsPage() {
     loadData();
   }, [loadData]);
 
-  const decide = async (id: number, status: "official" | "rejected") => {
+  const decideGroup = async (group: EnrollmentGroup, status: "official" | "rejected") => {
     try {
-      await apiFetch(`/admin/enrollments/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status, remarks: remarks[id] || null }),
-      });
-      toast.success(`Enrollment ${status}.`);
-      loadData();
+      await Promise.all(
+        group.rows.map((row) =>
+          apiFetch(`/admin/enrollments/${row.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status, remarks: groupRemarks[group.key] || null }),
+          })
+        )
+      );
+      toast.success(`${status === "official" ? "Approved" : "Rejected"} set for ${group.studentName}.`);
+      await loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update enrollment.");
     }
@@ -213,7 +267,7 @@ export default function AdminEnrollmentsPage() {
           </nav>
 
           <div className="border-t border-slate-200/80 px-4 py-3 dark:border-white/10">
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright · v1.0.0</p>
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright - v1.0.0</p>
           </div>
         </div>
       </aside>
@@ -283,40 +337,40 @@ export default function AdminEnrollmentsPage() {
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(30,64,175,0.16),transparent_45%),linear-gradient(180deg,#020617,#020b16_55%,#020617)]">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-slate-50 dark:bg-[radial-gradient(circle_at_top,rgba(30,64,175,0.16),transparent_45%),linear-gradient(180deg,#020617,#020b16_55%,#020617)]">
           <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
             <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-slate-100 sm:text-3xl">Enrollment Management</h1>
-                <p className="mt-1 text-slate-400">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Enrollment Management</h1>
+                <p className="mt-1 text-slate-600 dark:text-slate-400">
                   Manage period activation, review assessed subjects, and finalize approvals.
                 </p>
               </div>
               <Link href="/admin">
                 <Button
                   variant="outline"
-                  className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                  className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10 dark:hover:text-white"
                 >
                   Back to Admin
                 </Button>
               </Link>
             </div>
 
-            <Card className="border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-sm">
+            <Card className="border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/60">
               <CardHeader>
-                <CardTitle className="text-slate-100">Controls</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-slate-900 dark:text-slate-100">Controls</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
                   Filter requests and set active enrollment period.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-3">
                 <div>
-                  <p className="mb-1 text-sm text-slate-400">Status</p>
+                  <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Status</p>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="border-white/10 bg-slate-950/80 text-slate-100">
+                    <SelectTrigger className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-slate-950 text-slate-100">
+                    <SelectContent className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100">
                       <SelectItem value="all">All</SelectItem>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="unofficial">Unofficial</SelectItem>
@@ -326,12 +380,12 @@ export default function AdminEnrollmentsPage() {
                   </Select>
                 </div>
                 <div>
-                  <p className="mb-1 text-sm text-slate-400">Period</p>
+                  <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Period</p>
                   <Select value={periodFilter} onValueChange={setPeriodFilter}>
-                    <SelectTrigger className="border-white/10 bg-slate-950/80 text-slate-100">
+                    <SelectTrigger className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-slate-950 text-slate-100">
+                    <SelectContent className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100">
                       <SelectItem value="all">All Periods</SelectItem>
                       {periods.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>
@@ -343,15 +397,15 @@ export default function AdminEnrollmentsPage() {
                   </Select>
                 </div>
                 <div>
-                  <p className="mb-1 text-sm text-slate-400">Activate Period</p>
+                  <p className="mb-1 text-sm text-slate-600 dark:text-slate-400">Activate Period</p>
                   <Select
                     value={activePeriodId ? String(activePeriodId) : ""}
                     onValueChange={(value) => activatePeriod(Number(value))}
                   >
-                    <SelectTrigger className="border-white/10 bg-slate-950/80 text-slate-100">
+                    <SelectTrigger className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100">
                       <SelectValue placeholder="Choose active period" />
                     </SelectTrigger>
-                    <SelectContent className="border-white/10 bg-slate-950 text-slate-100">
+                    <SelectContent className="border-slate-200 bg-white text-slate-900 dark:border-white/10 dark:bg-slate-950 dark:text-slate-100">
                       {periods.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           {p.name}
@@ -363,65 +417,82 @@ export default function AdminEnrollmentsPage() {
               </CardContent>
             </Card>
 
-            <Card className="mt-6 border-white/10 bg-slate-900/60 shadow-xl backdrop-blur-sm">
+            <Card className="mt-6 border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/60">
               <CardHeader>
-                <CardTitle className="text-slate-100">Enrollment Requests</CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardTitle className="text-slate-900 dark:text-slate-100">Enrollment Requests</CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
                   Review unofficial requests and finalize approvals after verification.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-slate-400">Loading requests...</p>
-                ) : rows.length === 0 ? (
-                  <p className="text-slate-400">No enrollment requests found.</p>
+                  <p className="text-slate-600 dark:text-slate-400">Loading requests...</p>
+                ) : groupedRows.length === 0 ? (
+                  <p className="text-slate-600 dark:text-slate-400">No enrollment requests found.</p>
                 ) : (
                   <div className="space-y-4">
-                    {rows.map((row) => (
+                    {groupedRows.map((group) => (
                       <div
-                        key={row.id}
-                        className="space-y-3 rounded-xl border border-white/10 bg-slate-950/40 p-4"
+                        key={group.key}
+                        className="space-y-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-slate-950/40"
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-100">
-                              {row.course_code} - {row.course_title}
+                            <p className="font-semibold text-slate-900 dark:text-slate-100">{group.studentName}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">
+                              {group.studentEmail} - {group.periodName ?? "-"}
                             </p>
-                            <p className="text-sm text-slate-300">
-                              {row.student_name} ({row.student_email}) · {row.period_name ?? "-"}
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Subjects: {group.rows.length} - Total Units: {group.totalUnits.toFixed(2)}
                             </p>
-                            <p className="text-xs text-slate-400">
-                              Units: {row.units} · Section: {row.section ?? "-"} · Schedule: {row.schedule ?? "-"}
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Assessed: {group.assessedAt ? new Date(group.assessedAt).toLocaleString() : "-"}
                             </p>
-                            <p className="text-xs text-slate-400">
-                              Assessed: {row.assessed_at ? new Date(row.assessed_at).toLocaleString() : "-"}
-                            </p>
-                            {row.remarks ? (
-                              <p className="text-xs text-amber-300">Remarks: {row.remarks}</p>
-                            ) : null}
                           </div>
-                          <Badge className={statusBadgeClass(row.status)}>{row.status}</Badge>
+                          <Badge className={statusBadgeClass(group.status)}>{group.status}</Badge>
                         </div>
 
-                        {row.status === "unofficial" && (
+                        <div className="overflow-hidden rounded-lg border border-slate-200/70 dark:border-white/10">
+                          <div className="grid grid-cols-[120px_minmax(0,1fr)_70px_120px] gap-2 bg-slate-100/80 px-3 py-2 text-xs font-semibold text-slate-700 dark:bg-white/5 dark:text-slate-300">
+                            <span>Code</span>
+                            <span>Subject</span>
+                            <span>Units</span>
+                            <span>Section</span>
+                          </div>
+                          <div className="divide-y divide-slate-200/70 dark:divide-white/10">
+                            {group.rows.map((row) => (
+                              <div
+                                key={row.id}
+                                className="grid grid-cols-[120px_minmax(0,1fr)_70px_120px] gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
+                              >
+                                <span className="font-medium">{row.course_code}</span>
+                                <span className="truncate" title={row.course_title}>{row.course_title}</span>
+                                <span>{row.units}</span>
+                                <span className="truncate" title={row.section ?? "-"}>{row.section ?? "-"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {group.status === "unofficial" && (
                           <div className="flex flex-col gap-2 lg:flex-row">
                             <Input
-                              placeholder="Optional remarks"
-                              value={remarks[row.id] ?? ""}
+                              placeholder="Optional remarks for this student's set"
+                              value={groupRemarks[group.key] ?? ""}
                               onChange={(e) =>
-                                setRemarks((prev) => ({ ...prev, [row.id]: e.target.value }))
+                                setGroupRemarks((prev) => ({ ...prev, [group.key]: e.target.value }))
                               }
-                              className="border-white/10 bg-slate-950/80 text-slate-100 placeholder:text-slate-500"
+                              className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-500 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
                             />
-                            <Button onClick={() => decide(row.id, "official")} className="lg:min-w-28">
-                              Approve
+                            <Button onClick={() => decideGroup(group, "official")} className="lg:min-w-36">
+                              Approve Set
                             </Button>
                             <Button
                               variant="destructive"
-                              onClick={() => decide(row.id, "rejected")}
-                              className="lg:min-w-24"
+                              onClick={() => decideGroup(group, "rejected")}
+                              className="lg:min-w-32"
                             >
-                              Reject
+                              Reject Set
                             </Button>
                           </div>
                         )}

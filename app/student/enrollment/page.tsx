@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { FileDown, Wand2 } from "lucide-react";
 
 import { EnrollmentPageSkeleton } from "@/components/ui/loading-states";
+import StudentShell from "../_components/student-shell";
 
 import { apiFetch } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +22,12 @@ type EvalRow = {
   year_level: number;
   semester: number;
   grade: number | null;
-  result_status: "passed" | "failed" | "incomplete" | null;
+  result_status: "passed" | "failed" | "incomplete" | "credited" | null;
 };
 
 type SubjectOption = {
   id: number;
+  enrollmentId?: number;
   code: string;
   title: string;
   units: number;
@@ -59,6 +61,11 @@ const IT_CURRICULUM_FALLBACK: EvalRow[] = [
   { id: 1020, code: "NET101", title: "Networking I", units: 3, year_level: 3, semester: 2, grade: null, result_status: null },
 ];
 
+const isRowPassedEquivalent = (row: EvalRow) =>
+  row.result_status === "passed" ||
+  row.result_status === "credited" ||
+  (row.grade !== null && row.grade >= 75);
+
 const pickNextTerm = (rows: EvalRow[]): { year: number; sem: number } | null => {
   if (rows.length === 0) return null;
 
@@ -77,18 +84,23 @@ const pickNextTerm = (rows: EvalRow[]): { year: number; sem: number } | null => 
     })
     .sort((a, b) => (a.year === b.year ? a.sem - b.sem : a.year - b.year));
 
-  const current = sorted[sorted.length - 1];
-  const currentRows = terms.get(current.key) ?? [];
-  const allPassed =
-    currentRows.length > 0 &&
-    currentRows.every((r) => r.result_status === "passed" || (r.grade !== null && r.grade >= 75));
+  for (const term of sorted) {
+    const termRows = terms.get(term.key) ?? [];
+    if (termRows.length === 0) continue;
 
-  if (allPassed) {
-    if (current.sem === 1) return { year: current.year, sem: 2 };
-    return { year: current.year + 1, sem: 1 };
+    const allPassed = termRows.every(isRowPassedEquivalent);
+    if (!allPassed) {
+      return { year: term.year, sem: term.sem };
+    }
   }
 
-  return { year: current.year, sem: current.sem };
+  const last = sorted[sorted.length - 1];
+  if (last) {
+    if (last.sem === 1) return { year: last.year, sem: 2 };
+    return { year: last.year + 1, sem: 1 };
+  }
+
+  return null;
 };
 
 const buildSubjectOptions = (rows: EvalRow[]): SubjectOption[] => {
@@ -106,7 +118,7 @@ const buildSubjectOptions = (rows: EvalRow[]): SubjectOption[] => {
   }));
 };
 
-export default function StudentEnrollmentPage() {
+function StudentEnrollmentContent() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState<string>("");
   const [evalRows, setEvalRows] = useState<EvalRow[]>([]);
@@ -117,7 +129,30 @@ export default function StudentEnrollmentPage() {
   const [preEnlisted, setPreEnlisted] = useState<SubjectOption[]>([]);
   const [enrolledSubjects, setEnrolledSubjects] = useState<SubjectOption[]>([]);
   const [enrollmentStatus, setEnrollmentStatus] = useState<EnrollmentStatus>("not_enrolled");
-  const [yearLevelFilter, setYearLevelFilter] = useState<string>("all");
+  const [selectedCurriculumYear, setSelectedCurriculumYear] = useState<string>("");
+  const [selectedCurriculumSemester, setSelectedCurriculumSemester] = useState<string>("");
+  const [enrollmentSyncConnected, setEnrollmentSyncConnected] = useState<boolean | null>(null);
+  const [enrollmentSyncError, setEnrollmentSyncError] = useState<string>("");
+
+  const mapEnrollmentRowToSubject = (row: {
+    id: number;
+    course_id?: number;
+    code: string;
+    title: string;
+    units: number;
+    schedule?: string | null;
+    instructor?: string | null;
+    section?: string | null;
+  }): SubjectOption => ({
+    id: Number(row.course_id ?? row.id),
+    enrollmentId: Number(row.id),
+    code: row.code,
+    title: row.title,
+    units: Number(row.units ?? 0),
+    schedule: row.schedule ?? "-",
+    instructor: row.instructor ?? "-",
+    section: row.section ?? "-",
+  });
 
   useEffect(() => {
     const run = async () => {
@@ -148,57 +183,105 @@ export default function StudentEnrollmentPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const loadPreEnlistedFromBackend = async (pid: string) => {
+    const res = await apiFetch(`/student/enrollments/pre-enlisted?period_id=${pid}`);
+    const payload = res as {
+      pre_enlisted?: Array<{
+        id: number;
+        course_id: number;
+        code: string;
+        title: string;
+        units: number;
+        schedule: string | null;
+        instructor: string | null;
+        section: string | null;
+      }>;
+    };
+    setPreEnlisted((payload.pre_enlisted ?? []).map(mapEnrollmentRowToSubject));
+  };
+
+  const loadEnrolledFromBackend = async (pid: string) => {
+    const res = await apiFetch(`/student/enrollments/enrolled-subjects?period_id=${pid}`);
+    const payload = res as {
+      enrollment_status: EnrollmentStatus;
+      enrolled_subjects?: Array<{
+        id: number;
+        course_id: number;
+        code: string;
+        title: string;
+        units: number;
+        schedule: string | null;
+        instructor: string | null;
+        section: string | null;
+      }>;
+    };
+    setEnrollmentStatus(payload.enrollment_status ?? "not_enrolled");
+    setEnrolledSubjects((payload.enrolled_subjects ?? []).map(mapEnrollmentRowToSubject));
+  };
+
+  const refreshEnrollmentLists = async (pid: string) => {
+    await Promise.all([loadPreEnlistedFromBackend(pid), loadEnrolledFromBackend(pid)]);
+    setEnrollmentSyncConnected(true);
+    setEnrollmentSyncError("");
+  };
+
   useEffect(() => {
     if (!periodId) return;
     const run = async () => {
       try {
-        const res = await apiFetch(`/student/enrollments/enrolled-subjects?period_id=${periodId}`);
-        const payload = res as {
-          enrollment_status: EnrollmentStatus;
-          enrolled_subjects: {
-            id: number;
-            code: string;
-            title: string;
-            units: number;
-            schedule: string | null;
-            instructor: string | null;
-            section: string | null;
-          }[];
-        };
-
-        const fetchedStatus = payload.enrollment_status ?? "not_enrolled";
-        setEnrollmentStatus(fetchedStatus === "official" ? "unofficial" : fetchedStatus);
-        const enrolled = (payload.enrolled_subjects ?? []).map((row) => ({
-          id: row.id,
-          code: row.code,
-          title: row.title,
-          units: Number(row.units ?? 0),
-          schedule: row.schedule ?? "-",
-          instructor: row.instructor ?? "-",
-          section: row.section ?? "-",
-        }));
-        setEnrolledSubjects(enrolled);
-      } catch {
-        // Leave local state when endpoint is unavailable.
+        await refreshEnrollmentLists(periodId);
+      } catch (error) {
+        setEnrollmentSyncConnected(false);
+        setEnrollmentSyncError(error instanceof Error ? error.message : "Failed to load enrollment records from server.");
       }
     };
-    run();
+    void run();
   }, [periodId]);
 
   const targetTerm = useMemo(() => pickNextTerm(evalRows), [evalRows]);
 
+  useEffect(() => {
+    if (!targetTerm) return;
+    setSelectedCurriculumYear((prev) => (prev ? prev : String(targetTerm.year)));
+    setSelectedCurriculumSemester((prev) => (prev ? prev : String(targetTerm.sem)));
+  }, [targetTerm]);
+
+  const curriculumYearOptions = useMemo(() => {
+    const uniqueYears = Array.from(new Set(evalRows.map((r) => r.year_level))).sort((a, b) => a - b);
+    return uniqueYears;
+  }, [evalRows]);
+
+  const curriculumSemesterOptions = useMemo(() => {
+    const selectedYearNum = Number(selectedCurriculumYear);
+    const base = evalRows.filter((r) => (selectedYearNum ? r.year_level === selectedYearNum : true));
+    const uniqueSems = Array.from(new Set(base.map((r) => r.semester))).sort((a, b) => a - b);
+    return uniqueSems;
+  }, [evalRows, selectedCurriculumYear]);
+
+  useEffect(() => {
+    if (!curriculumSemesterOptions.length) return;
+    if (!selectedCurriculumSemester || !curriculumSemesterOptions.includes(Number(selectedCurriculumSemester))) {
+      setSelectedCurriculumSemester(String(curriculumSemesterOptions[0]));
+    }
+  }, [curriculumSemesterOptions, selectedCurriculumSemester]);
+
   const availableSubjects = useMemo(() => {
-    if (!targetTerm) return [];
-    const level = yearLevelFilter === "all" ? null : Number(yearLevelFilter);
+    const selectedYear = Number(selectedCurriculumYear);
+    const selectedSemester = Number(selectedCurriculumSemester);
+    if (!selectedYear || !selectedSemester) return [];
+    const blockedIds = new Set([
+      ...preEnlisted.map((s) => s.id),
+      ...enrolledSubjects.map((s) => s.id),
+    ]);
     const filtered = evalRows.filter(
       (r) =>
-        r.year_level === targetTerm.year &&
-        r.semester === targetTerm.sem &&
-        r.result_status !== "passed" &&
-        (level === null || r.year_level === level)
+        r.year_level === selectedYear &&
+        r.semester === selectedSemester &&
+        !isRowPassedEquivalent(r) &&
+        !blockedIds.has(r.id)
     );
     return buildSubjectOptions(filtered);
-  }, [evalRows, targetTerm, yearLevelFilter]);
+  }, [evalRows, selectedCurriculumYear, selectedCurriculumSemester, preEnlisted, enrolledSubjects]);
 
   const selectedAvailable = useMemo(
     () => availableSubjects.find((s) => s.id === selectedAvailableId) ?? null,
@@ -213,8 +296,16 @@ export default function StudentEnrollmentPage() {
     () => enrolledSubjects.reduce((sum, row) => sum + Number(row.units || 0), 0),
     [enrolledSubjects]
   );
+  const isEnrollmentLocked = enrollmentStatus === "unofficial" || enrollmentStatus === "official";
 
-  const addSelectedSubject = () => {
+  const panelClass =
+    "rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/80";
+
+  const addSelectedSubject = async () => {
+    if (isEnrollmentLocked) {
+      toast.error("Enrollment is already submitted. Wait for admin approval to modify subjects.");
+      return;
+    }
     if (!selectedAvailable) {
       toast.error("Select a subject first.");
       return;
@@ -224,46 +315,202 @@ export default function StudentEnrollmentPage() {
       toast("Subject already in Pre-Enlisted.");
       return;
     }
-    setPreEnlisted((rows) => [...rows, selectedAvailable]);
-    toast.success(`${selectedAvailable.code} added to Pre-Enlisted.`);
+    if (!periodId) {
+      toast.error("Select a period first.");
+      return;
+    }
+
+    try {
+      await apiFetch("/student/enrollments/add", {
+        method: "POST",
+        body: JSON.stringify({
+          course_id: selectedAvailable.id,
+          period_id: Number(periodId),
+        }),
+      });
+      await loadPreEnlistedFromBackend(periodId);
+      setEnrollmentSyncConnected(true);
+      setEnrollmentSyncError("");
+      toast.success(`${selectedAvailable.code} added to Pre-Enlisted.`);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to add subject.";
+      setEnrollmentSyncConnected(false);
+      setEnrollmentSyncError(message);
+      toast.error(`Server add failed: ${message}`);
+      return;
+    }
   };
 
-  const removePreEnlisted = (id: number) => {
+  const removePreEnlisted = async (id: number) => {
+    if (isEnrollmentLocked) {
+      toast.error("Enrollment is already submitted. Pre-enlisted subjects are locked.");
+      return;
+    }
+    const target = preEnlisted.find((row) => row.id === id);
+    if (!target) return;
+
+    if (target.enrollmentId && periodId) {
+      try {
+        await apiFetch(`/student/enrollments/${target.enrollmentId}`, { method: "DELETE" });
+        await loadPreEnlistedFromBackend(periodId);
+        setEnrollmentSyncConnected(true);
+        setEnrollmentSyncError("");
+        toast.success("Removed from Pre-Enlisted.");
+        return;
+      } catch (error) {
+        setEnrollmentSyncConnected(false);
+        setEnrollmentSyncError(error instanceof Error ? error.message : "Failed to remove subject.");
+        toast.error(error instanceof Error ? error.message : "Failed to remove subject.");
+        return;
+      }
+    }
+
     setPreEnlisted((rows) => rows.filter((row) => row.id !== id));
   };
 
-  const autoPreEnlist = () => {
-    if (availableSubjects.length === 0) {
-      toast.error("No available subjects to auto-add.");
+  const removeAllPreEnlisted = async () => {
+    if (isEnrollmentLocked) {
+      toast.error("Enrollment is already submitted. Pre-enlisted subjects are locked.");
       return;
     }
-    setPreEnlisted(availableSubjects);
-    toast.success("Subjects auto-added from curriculum evaluation.");
+    if (preEnlisted.length === 0) {
+      toast.error("No pre-enlisted subjects to remove.");
+      return;
+    }
+    if (!periodId) {
+      toast.error("Select a period first.");
+      return;
+    }
+
+    try {
+      await apiFetch(`/student/enrollments?period_id=${Number(periodId)}`, { method: "DELETE" });
+      await loadPreEnlistedFromBackend(periodId);
+      setEnrollmentSyncConnected(true);
+      setEnrollmentSyncError("");
+      toast.success("Removed all pre-enlisted subjects.");
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to clear pre-enlisted subjects.";
+      setEnrollmentSyncConnected(false);
+      setEnrollmentSyncError(message);
+      toast.error(`Server remove-all failed: ${message}`);
+      return;
+    }
+  };
+
+  const autoPreEnlist = async () => {
+    if (isEnrollmentLocked) {
+      toast.error("Enrollment is already submitted. Auto pre-enlist is disabled.");
+      return;
+    }
+    if (!periodId) {
+      toast.error("Select a period first.");
+      return;
+    }
+
+    if (availableSubjects.length === 0) {
+      toast.error("No available subjects found for the selected year/semester.");
+      return;
+    }
+
+    try {
+      const results = await Promise.allSettled(
+        availableSubjects.map((subject) =>
+          apiFetch("/student/enrollments/add", {
+            method: "POST",
+            body: JSON.stringify({
+              course_id: subject.id,
+              period_id: Number(periodId),
+            }),
+          })
+        )
+      );
+
+      const failedMessages = results
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => (r.reason instanceof Error ? r.reason.message : "Request failed."));
+
+      const nonDuplicateFailures = failedMessages.filter(
+        (msg) => !/already in pre-enlisted|already in enrolled subjects/i.test(msg)
+      );
+
+      await loadPreEnlistedFromBackend(periodId);
+      setEnrollmentSyncConnected(true);
+      setEnrollmentSyncError("");
+
+      if (nonDuplicateFailures.length > 0) {
+        toast.error(`Some subjects were not added: ${nonDuplicateFailures[0]}`);
+        return;
+      }
+
+      const addedCount = results.filter((r) => r.status === "fulfilled").length;
+      const yearLabel =
+        selectedCurriculumYear === "1"
+          ? "1st Year"
+          : selectedCurriculumYear === "2"
+            ? "2nd Year"
+            : selectedCurriculumYear === "3"
+              ? "3rd Year"
+              : selectedCurriculumYear === "4"
+                ? "4th Year"
+                : `Year ${selectedCurriculumYear}`;
+      const semLabel =
+        selectedCurriculumSemester === "1"
+          ? "1st Semester"
+          : selectedCurriculumSemester === "2"
+            ? "2nd Semester"
+            : selectedCurriculumSemester === "3"
+              ? "Midyear/Summer"
+              : `Sem ${selectedCurriculumSemester}`;
+
+      toast.success(
+        `Auto pre-enlist synced for ${yearLabel} ${semLabel}. Added ${addedCount} subject(s).`
+      );
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to auto pre-enlist.";
+      setEnrollmentSyncConnected(false);
+      setEnrollmentSyncError(message);
+      toast.error(`Server auto pre-enlist failed: ${message}`);
+      return;
+    }
   };
 
   const assessEnrollment = async () => {
+    if (isEnrollmentLocked) {
+      toast.error("Enrollment is already submitted.");
+      return;
+    }
     if (preEnlisted.length === 0) {
       toast.error("Add subjects to Pre-Enlisted before assessment.");
       return;
     }
 
+    if (!periodId) {
+      toast.error("Select a period first.");
+      return;
+    }
+
     try {
-      // Best-effort backend call. If endpoint is not ready yet, keep UI flow working.
       await apiFetch("/student/enrollments/assess", {
         method: "POST",
         body: JSON.stringify({
           period_id: Number(periodId || 0),
-          subject_ids: preEnlisted.map((s) => s.id),
         }),
       });
-    } catch {
-      // no-op fallback
+      await refreshEnrollmentLists(periodId);
+      setEnrollmentSyncConnected(true);
+      setEnrollmentSyncError("");
+      toast.success("Assessment completed. Status is now Unofficially Enrolled.");
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to assess enrollment.";
+      setEnrollmentSyncConnected(false);
+      setEnrollmentSyncError(message);
+      toast.error(`Server assess failed: ${message}. Admin will not receive this request.`);
+      return;
     }
-
-    setEnrolledSubjects(preEnlisted);
-    setPreEnlisted([]);
-    setEnrollmentStatus("unofficial");
-    toast.success("Assessment completed. Status is now Unofficially Enrolled.");
   };
 
   const openSubjectListPdf = () => {
@@ -324,47 +571,141 @@ export default function StudentEnrollmentPage() {
   }
 
   return (
-    <main className="student-page min-h-screen bg-slate-100 p-4 md:p-6 dark:bg-transparent">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Student Enrollment</h1>
-            <p className="text-slate-600">Pre-enlist subjects, assess, and track enrollment status.</p>
+    <main className="student-page min-h-screen bg-slate-100/80 p-4 md:p-6 dark:bg-transparent">
+      <div className="mx-auto max-w-7xl space-y-5 md:space-y-6">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/80">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="rounded-full border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/10 dark:text-blue-200">
+              Online Services
+            </Badge>
+            <Badge variant="outline" className="rounded-full">
+              Enrollment
+            </Badge>
+            {targetTerm ? (
+              <Badge variant="outline" className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                Target: Year {targetTerm.year} / Sem {targetTerm.sem}
+              </Badge>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            {enrollmentStatus === "unofficial" && <Badge className="bg-amber-600">Unofficially Enrolled</Badge>}
-            {enrollmentStatus === "not_enrolled" && <Badge variant="outline">Not Enrolled</Badge>}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 md:text-3xl dark:text-slate-100">Student Enrollment</h1>
+              <p className="text-slate-600 dark:text-slate-300">
+                Pre-enlist subjects, assess, and track enrollment status.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {enrollmentStatus === "official" && <Badge className="bg-emerald-600">Officially Enrolled</Badge>}
+              {enrollmentStatus === "unofficial" && <Badge className="bg-amber-600">Unofficially Enrolled</Badge>}
+              {enrollmentStatus === "not_enrolled" && <Badge variant="outline">Not Enrolled</Badge>}
+            </div>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Enrollment Controls</CardTitle>
-            <CardDescription>Choose period, auto-add based on evaluation, assess, and print files.</CardDescription>
+        <div className="rounded-2xl border border-slate-200/90 bg-slate-100/80 px-4 py-3 text-sm dark:border-white/10 dark:bg-white/5">
+          <p className="font-semibold text-slate-700 dark:text-slate-200">DISCLAIMER</p>
+          <p className="mt-1 leading-relaxed text-slate-600 dark:text-slate-300">
+            Subject lists (PRE-REG / File) may be viewed after assessment. COR is only available once your enrollment is officially approved.
+          </p>
+        </div>
+
+        {enrollmentSyncConnected === false && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100">
+            <p className="font-semibold">Enrollment sync issue</p>
+            <p className="mt-1">
+              Student page could not sync enrollment actions to the backend. Admin will not see requests until this is fixed.
+              {enrollmentSyncError ? ` (${enrollmentSyncError})` : ""}
+            </p>
+          </div>
+        )}
+
+        {enrollmentSyncConnected === true && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+            Enrollment actions are synced to the backend. After clicking <span className="font-semibold">Assess</span>, admin can review them in <span className="font-semibold">Admin → Enrollments → Enrollment Requests</span>.
+          </div>
+        )}
+
+        {isEnrollmentLocked && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+            <p className="font-semibold">Enrollment is locked after assessment.</p>
+            <p className="mt-1">
+              Available Subjects and Pre-Enlisted Subjects are read-only now to prevent duplicate requests. Refresh will continue loading your submitted subjects from the backend.
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/85 px-4 py-3 shadow-sm dark:border-white/10 dark:bg-slate-900/80">
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+            <span className="font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Workflow</span>
+            <Badge variant="outline" className="rounded-full">Available Subjects</Badge>
+            <span className="text-slate-400">→</span>
+            <Badge variant="outline" className="rounded-full">Pre-Enlisted</Badge>
+            <span className="text-slate-400">→</span>
+            <Badge variant="outline" className="rounded-full">Assess</Badge>
+            <span className="text-slate-400">→</span>
+            <Badge variant="outline" className="rounded-full">Unofficial / Official</Badge>
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Pre-Enlisted: <span className="font-semibold text-slate-700 dark:text-slate-200">{preEnlisted.length}</span> | Enrolled:{" "}
+            <span className="font-semibold text-slate-700 dark:text-slate-200">{enrolledSubjects.length}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Enrollment Session</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Select period, auto-pre-enlist from curriculum evaluation, then assess your subject list.
+            </p>
+          </div>
+        </div>
+
+        <Card className={panelClass}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-slate-900 dark:text-slate-100">Enrollment Controls</CardTitle>
+            <CardDescription className="dark:text-slate-300">
+              Choose period, auto-add based on evaluation, assess, and print files.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid md:grid-cols-6 gap-3">
-            <div className="md:col-span-2">
-              <p className="text-sm mb-1 text-slate-600">Year Level</p>
-              <Select value={yearLevelFilter} onValueChange={setYearLevelFilter}>
-                <SelectTrigger>
+          <CardContent className="grid gap-3 lg:grid-cols-12">
+            <div className="lg:col-span-2">
+              <p className="mb-1 text-sm text-slate-600 dark:text-slate-300">Curriculum Year</p>
+              <Select value={selectedCurriculumYear} onValueChange={setSelectedCurriculumYear} disabled={isEnrollmentLocked}>
+                <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white/95 shadow-sm dark:border-white/15 dark:bg-slate-950/80">
                   <SelectValue placeholder="Select year level" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="1">1st Year</SelectItem>
-                  <SelectItem value="2">2nd Year</SelectItem>
-                  <SelectItem value="3">3rd Year</SelectItem>
-                  <SelectItem value="4">4th Year</SelectItem>
+                <SelectContent className="rounded-xl border-slate-200/90 dark:border-white/10">
+                  {curriculumYearOptions.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year === 1 ? "1st Year" : year === 2 ? "2nd Year" : year === 3 ? "3rd Year" : year === 4 ? "4th Year" : `Year ${year}`}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="md:col-span-2">
-              <p className="text-sm mb-1 text-slate-600">Period</p>
-              <Select value={periodId} onValueChange={setPeriodId} disabled={loading}>
-                <SelectTrigger>
+            <div className="lg:col-span-2">
+              <p className="mb-1 text-sm text-slate-600 dark:text-slate-300">Curriculum Semester</p>
+              <Select value={selectedCurriculumSemester} onValueChange={setSelectedCurriculumSemester} disabled={isEnrollmentLocked}>
+                <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white/95 shadow-sm dark:border-white/15 dark:bg-slate-950/80">
+                  <SelectValue placeholder="Select semester" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-slate-200/90 dark:border-white/10">
+                  {curriculumSemesterOptions.map((sem) => (
+                    <SelectItem key={sem} value={String(sem)}>
+                      {sem === 1 ? "1st Semester" : sem === 2 ? "2nd Semester" : sem === 3 ? "Midyear / Summer" : `Semester ${sem}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-4">
+              <p className="mb-1 text-sm text-slate-600 dark:text-slate-300">Period</p>
+              <Select value={periodId} onValueChange={setPeriodId} disabled={loading || isEnrollmentLocked}>
+                <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white/95 shadow-sm dark:border-white/15 dark:bg-slate-950/80">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl border-slate-200/90 dark:border-white/10">
                   {periods.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}
@@ -374,100 +715,202 @@ export default function StudentEnrollmentPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="md:col-span-2 flex items-end gap-2 flex-wrap">
-              <Button type="button" variant="outline" onClick={autoPreEnlist}>
+            <div className="lg:col-span-4 flex flex-wrap items-end gap-2">
+              <Button type="button" variant="outline" onClick={autoPreEnlist} disabled={isEnrollmentLocked} className="rounded-xl">
                 <Wand2 className="mr-2 h-4 w-4" />
                 Auto
               </Button>
-              <Button type="button" onClick={assessEnrollment}>
+              <Button type="button" onClick={assessEnrollment} disabled={isEnrollmentLocked} className="rounded-xl bg-blue-600 hover:bg-blue-700">
                 Assess
               </Button>
-              <Button type="button" variant="outline" onClick={openSubjectListPdf}>
+              <Button type="button" variant="outline" onClick={openSubjectListPdf} className="rounded-xl">
                 <FileDown className="mr-2 h-4 w-4" />
                 File
               </Button>
-              <Button type="button" variant="outline" onClick={viewCor}>
+              <Button type="button" variant="outline" onClick={viewCor} className="rounded-xl">
                 View COR
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Available Subjects</CardTitle>
-              <CardDescription>
-                {targetTerm ? `Year ${targetTerm.year} - Sem ${targetTerm.sem}` : "No curriculum term detected."}
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Card className={`${panelClass} xl:col-span-1`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-900 dark:text-slate-100">Available Subjects</CardTitle>
+              <CardDescription className="dark:text-slate-300">
+                {selectedCurriculumYear && selectedCurriculumSemester
+                  ? `Curriculum Evaluation target: Year ${selectedCurriculumYear} - Sem ${selectedCurriculumSemester}`
+                  : targetTerm
+                    ? `Suggested next term: Year ${targetTerm.year} - Sem ${targetTerm.sem}`
+                    : "No curriculum term detected."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select
-                value={selectedAvailableId ? String(selectedAvailableId) : ""}
-                onValueChange={(value) => setSelectedAvailableId(Number(value))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableSubjects.map((row) => (
-                    <SelectItem key={row.id} value={String(row.id)}>
-                      {row.code} - {row.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" className="w-full" onClick={addSelectedSubject}>
-                Add
-              </Button>
-              {availableSubjects.length === 0 && (
-                <p className="text-sm text-slate-500">No available subjects found from curriculum evaluation.</p>
+              {isEnrollmentLocked ? (
+                <div className="rounded-xl border border-dashed border-slate-300/80 px-3 py-4 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
+                  Available Subjects is locked after assessment. Your submitted subject list is shown in <span className="font-semibold">Enrolled Subjects</span>.
+                </div>
+              ) : (
+                <>
+                  <Select
+                    value={selectedAvailableId ? String(selectedAvailableId) : ""}
+                    onValueChange={(value) => setSelectedAvailableId(Number(value))}
+                  >
+                    <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white/95 shadow-sm dark:border-white/15 dark:bg-slate-950/80">
+                      <SelectValue placeholder="Select a subject" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-slate-200/90 dark:border-white/10">
+                      {availableSubjects.map((row) => (
+                        <SelectItem key={row.id} value={String(row.id)}>
+                          {row.code} - {row.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" className="w-full rounded-xl bg-blue-600 hover:bg-blue-700" onClick={addSelectedSubject}>
+                      Add
+                    </Button>
+                    <Button type="button" variant="outline" className="w-full rounded-xl" onClick={autoPreEnlist}>
+                      Add All
+                    </Button>
+                  </div>
+                  {selectedAvailable && (
+                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 text-sm dark:border-blue-400/20 dark:bg-blue-500/10">
+                      <p className="font-semibold text-blue-900 dark:text-blue-100">
+                        {selectedAvailable.code} - {selectedAvailable.title}
+                      </p>
+                      <p className="mt-1 text-blue-700 dark:text-blue-200">
+                        {selectedAvailable.units} units | Section {selectedAvailable.section} | {selectedAvailable.schedule}
+                      </p>
+                    </div>
+                  )}
+                  {availableSubjects.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-slate-300/80 px-3 py-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                      No available subjects found from curriculum evaluation.
+                    </div>
+                  )}
+                  {availableSubjects.length > 0 && (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 text-sm dark:border-white/10 dark:bg-white/5">
+                      <p className="mb-2 font-semibold text-slate-800 dark:text-slate-100">Available Subjects & Sections</p>
+                      <div className="max-h-44 space-y-2 overflow-auto pr-1">
+                        {availableSubjects.map((row) => (
+                          <button
+                            key={`avail-list-${row.id}`}
+                            type="button"
+                            onClick={() => setSelectedAvailableId(row.id)}
+                            className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                              selectedAvailableId === row.id
+                                ? "border-blue-300 bg-blue-50 dark:border-blue-400/30 dark:bg-blue-500/10"
+                                : "border-slate-200 bg-white/80 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+                            }`}
+                          >
+                            <p className="font-medium text-slate-900 dark:text-slate-100">
+                              {row.code} - {row.title}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300">
+                              Sec {row.section} | {row.schedule} | {row.units} units
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Pre-Enlisted Subjects</CardTitle>
-              <CardDescription>Chosen subjects before assessment.</CardDescription>
+          <Card className={`${panelClass} xl:col-span-1`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-slate-900 dark:text-slate-100">Pre-Enlisted Subjects</CardTitle>
+                <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={removeAllPreEnlisted} disabled={isEnrollmentLocked}>
+                  Remove All
+                </Button>
+              </div>
+              <CardDescription className="dark:text-slate-300">Chosen subjects before assessment.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              {isEnrollmentLocked && (
+                <div className="rounded-xl border border-dashed border-slate-300/80 px-3 py-3 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
+                  Pre-Enlisted is locked after assessment. Changes are disabled until admin review.
+                </div>
+              )}
+              <div className="max-h-[20rem] space-y-2 overflow-auto pr-1">
               {preEnlisted.map((row) => (
-                <div key={row.id} className="rounded-md border border-slate-200 p-2">
-                  <p className="font-medium text-slate-900">{row.code} - {row.title}</p>
-                  <p className="text-xs text-slate-600">
-                    {row.units} units | Sec {row.section} | {row.schedule}
-                  </p>
-                  <Button size="sm" variant="ghost" onClick={() => removePreEnlisted(row.id)} className="mt-1">
+                <div key={row.id} className="rounded-xl border border-slate-200/90 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">{row.code} - {row.title}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        {row.units} units | Sec {row.section} | {row.schedule}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 rounded-full">
+                      {row.units}u
+                    </Badge>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => removePreEnlisted(row.id)} disabled={isEnrollmentLocked} className="mt-1 rounded-lg">
                     Remove
                   </Button>
                 </div>
               ))}
-              {preEnlisted.length === 0 && <p className="text-sm text-slate-500">No pre-enlisted subjects yet.</p>}
-              <p className="text-sm font-semibold text-slate-800 text-right">Total: {preTotalUnits} units</p>
+              </div>
+              {preEnlisted.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-300/80 px-3 py-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  No pre-enlisted subjects yet.
+                </div>
+              )}
+              <p className="text-right text-sm font-semibold text-slate-800 dark:text-slate-200">Total: {preTotalUnits} units</p>
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Enrolled Subjects</CardTitle>
-              <CardDescription>Shown after clicking Assess.</CardDescription>
+          <Card className={`${panelClass} xl:col-span-1`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-900 dark:text-slate-100">Enrolled Subjects</CardTitle>
+              <CardDescription className="dark:text-slate-300">Shown after clicking Assess.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              <div className="max-h-[20rem] space-y-2 overflow-auto pr-1">
               {enrolledSubjects.map((row) => (
-                <div key={row.id} className="rounded-md border border-slate-200 p-2">
-                  <p className="font-medium text-slate-900">{row.code} - {row.title}</p>
-                  <p className="text-xs text-slate-600">
+                <div key={row.id} className="rounded-xl border border-slate-200/90 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">{row.code} - {row.title}</p>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
                     {row.units} units | Sec {row.section} | {row.schedule}
                   </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0 rounded-full border-emerald-200 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-200">
+                      {row.units}u
+                    </Badge>
+                  </div>
                 </div>
               ))}
-              {enrolledSubjects.length === 0 && <p className="text-sm text-slate-500">No enrolled subjects yet.</p>}
-              <p className="text-sm font-semibold text-slate-800 text-right">Total: {enrolledTotalUnits} units</p>
+              </div>
+              {enrolledSubjects.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-300/80 px-3 py-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+                  No enrolled subjects yet.
+                </div>
+              )}
+              <p className="text-right text-sm font-semibold text-slate-800 dark:text-slate-200">Total: {enrolledTotalUnits} units</p>
             </CardContent>
           </Card>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function StudentEnrollmentPage() {
+  return (
+    <StudentShell
+      initialSection="student-enrollment"
+      customSectionContent={{
+        "student-enrollment": <StudentEnrollmentContent />,
+      }}
+    />
   );
 }

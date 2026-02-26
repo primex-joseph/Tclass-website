@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
 import { ArrowUpDown, Calendar, ClipboardList, Clock3, ListChecks, Printer, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiFetch } from "@/lib/api-client";
 import {
   classScheduleCards,
   dashboardStats,
@@ -20,6 +21,27 @@ import {
 } from "./student-data";
 
 type RowValue = ReactNode[] | string[];
+type CurriculumEvaluationApiRow = {
+  id?: number;
+  code: string;
+  title: string;
+  units?: number | null;
+  year_level?: number | null;
+  semester?: number | null;
+  grade?: number | null;
+  result_status?: "passed" | "failed" | "incomplete" | "credited" | null;
+  prerequisite_code?: string | null;
+};
+
+type EvaluationMatrixRow = {
+  termLabel: string;
+  code: string;
+  title: string;
+  units: string;
+  grade: string;
+  remark: string;
+  preReq: string;
+};
 
 type ReportGradeTerm = {
   id: string;
@@ -82,6 +104,60 @@ const reportGradeTerms: ReportGradeTerm[] = [
     ],
   },
 ];
+
+const toTitleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+
+const semesterLabel = (semester: number) => {
+  if (semester === 1) return "1st Sem";
+  if (semester === 2) return "2nd Sem";
+  if (semester === 3) return "Summer";
+  return `Sem ${semester}`;
+};
+
+const yearLevelLabel = (year: number) => {
+  if (year === 1) return "1st Year";
+  if (year === 2) return "2nd Year";
+  if (year === 3) return "3rd Year";
+  if (year === 4) return "4th Year";
+  return `Year ${year}`;
+};
+
+const formatTermLabel = (year?: number | null, semester?: number | null) => {
+  if (!year || !semester) return "Unassigned Term";
+  return `${yearLevelLabel(year)} - ${semesterLabel(semester)}`;
+};
+
+const mapFallbackEvaluationRows = (): EvaluationMatrixRow[] =>
+  evaluationRows.map((r) => ({
+    termLabel: String(r[0]),
+    code: String(r[1]),
+    title: String(r[2]),
+    units: "-",
+    grade: "-",
+    remark: String(r[4]),
+    preReq: String(r[3] || "-"),
+  }));
+
+const mapApiEvaluationRows = (rows: CurriculumEvaluationApiRow[]): EvaluationMatrixRow[] =>
+  [...rows]
+    .sort((a, b) => {
+      const ay = Number(a.year_level ?? 999);
+      const by = Number(b.year_level ?? 999);
+      if (ay !== by) return ay - by;
+      const as = Number(a.semester ?? 999);
+      const bs = Number(b.semester ?? 999);
+      if (as !== bs) return as - bs;
+      return String(a.code).localeCompare(String(b.code));
+    })
+    .map((row) => ({
+      termLabel: formatTermLabel(row.year_level, row.semester),
+      code: row.code,
+      title: row.title,
+      units: row.units == null ? "-" : Number(row.units).toFixed(2),
+      grade: row.grade == null ? "-" : Number(row.grade).toFixed(2),
+      remark: row.result_status ? toTitleCase(row.result_status) : "Pending",
+      preReq: row.prerequisite_code || "-",
+    }));
 
 const ayTermOptions = [
   "2025-2026 2nd Semester",
@@ -514,6 +590,168 @@ function LedgerTable() {
   );
 }
 
+function AcademicEvaluationMatrixSection() {
+  const [rows, setRows] = useState<EvaluationMatrixRow[]>(mapFallbackEvaluationRows());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const run = async () => {
+      try {
+        const res = await apiFetch("/student/curriculum-evaluation");
+        const apiRows = ((res as { evaluation?: CurriculumEvaluationApiRow[] }).evaluation ?? []).filter(
+          (row): row is CurriculumEvaluationApiRow => Boolean(row?.code && row?.title)
+        );
+        if (!mounted) return;
+        if (apiRows.length > 0) {
+          setRows(mapApiEvaluationRows(apiRows));
+        } else {
+          setRows(mapFallbackEvaluationRows());
+        }
+      } catch {
+        if (mounted) setRows(mapFallbackEvaluationRows());
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const groupedRows = useMemo(
+    () =>
+      rows.reduce<Array<{ term: string; rows: EvaluationMatrixRow[] }>>((acc, row) => {
+        const last = acc[acc.length - 1];
+        if (!last || last.term !== row.termLabel) {
+          acc.push({ term: row.termLabel, rows: [row] });
+        } else {
+          last.rows.push(row);
+        }
+        return acc;
+      }, []),
+    [rows]
+  );
+
+  const summary = useMemo(() => {
+    const total = rows.length;
+    const passed = rows.filter((r) => r.remark === "Passed" || r.remark === "Credited").length;
+    const failed = rows.filter((r) => r.remark === "Failed").length;
+    const unfinished = rows.filter((r) => r.remark === "Incomplete" || r.remark === "Pending").length;
+    return { total, passed, failed, unfinished };
+  }, [rows]);
+
+  const rowTone = (remark: string) => {
+    if (remark === "Failed") return "bg-rose-100/90 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100";
+    if (remark === "Incomplete" || remark === "Pending") {
+      return "bg-amber-100/90 text-amber-900 dark:bg-amber-900/25 dark:text-amber-100";
+    }
+    return "";
+  };
+
+  const remarkTone = (remark: string) => {
+    if (remark === "Passed") return "text-emerald-700 dark:text-emerald-300";
+    if (remark === "Credited") return "text-blue-700 dark:text-blue-300";
+    if (remark === "Failed") return "text-rose-700 dark:text-rose-300";
+    if (remark === "Incomplete" || remark === "Pending") return "text-amber-700 dark:text-amber-300";
+    return "text-slate-700 dark:text-slate-200";
+  };
+
+  return (
+    <div className="space-y-4 sm:space-y-5">
+      <SectionHeader title="Academic Evaluation" subtitle="Curriculum evaluation in SIAS-style format (modern portal shell)." />
+
+      <div className="rounded-2xl border border-slate-200/80 bg-white/85 px-4 py-3 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/80">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Curriculum</p>
+        <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          <span className="font-semibold">{studentProfile.program}</span> curriculum evaluation matrix grouped by year/term.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="rounded-full">
+          Count: {summary.total}
+        </Badge>
+        <Badge className="rounded-full bg-emerald-600">Passed/Credited: {summary.passed}</Badge>
+        <Badge className="rounded-full bg-rose-600">Failed: {summary.failed}</Badge>
+        <Badge className="rounded-full bg-amber-600 text-white">Unfinished: {summary.unfinished}</Badge>
+        {loading ? <span className="text-xs text-slate-500 dark:text-slate-400">Loading latest evaluation...</span> : null}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-blue-700/50 bg-white shadow-sm dark:border-blue-400/20 dark:bg-slate-900">
+        <div className="overflow-x-auto">
+          <table className="min-w-[1120px] w-full table-fixed text-sm">
+            <thead className="sticky top-0 z-10 bg-blue-800 text-white">
+              <tr>
+                <th className="w-24 px-4 py-3 text-left font-semibold">Code</th>
+                <th className="px-4 py-3 text-left font-semibold">Name</th>
+                <th className="w-20 px-4 py-3 text-left font-semibold">Units</th>
+                <th className="w-20 px-4 py-3 text-left font-semibold">Grade</th>
+                <th className="w-32 px-4 py-3 text-left font-semibold">Remark</th>
+                <th className="w-40 px-4 py-3 text-left font-semibold">Pre-requisites</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupedRows.flatMap((group, groupIndex) => {
+                const termHeader = (
+                  <tr
+                    key={`${group.term}-${groupIndex}-header`}
+                    className="border-b border-blue-200/60 dark:border-blue-400/10"
+                  >
+                    <td
+                      colSpan={6}
+                      className="bg-blue-700 px-4 py-2 text-sm font-semibold text-white dark:bg-blue-700/90"
+                    >
+                      {group.term}
+                    </td>
+                  </tr>
+                );
+
+                const termRows = group.rows.map((r, rowIndex) => {
+                  const zebra =
+                    (groupIndex + rowIndex) % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/70 dark:bg-white/5";
+                  return (
+                    <tr
+                      key={`${group.term}-${r.code}-${rowIndex}`}
+                      className={`${zebra} ${rowTone(r.remark)} border-b border-blue-200/60 dark:border-blue-400/10`}
+                    >
+                      <td className="px-4 py-2.5 align-top font-medium tabular-nums">{r.code}</td>
+                      <td className="px-4 py-2.5 align-top">{r.title}</td>
+                      <td className="px-4 py-2.5 align-top tabular-nums">{r.units}</td>
+                      <td className="px-4 py-2.5 align-top tabular-nums">{r.grade}</td>
+                      <td className={`px-4 py-2.5 align-top font-semibold ${remarkTone(r.remark)}`}>{r.remark}</td>
+                      <td className="px-4 py-2.5 align-top">{r.preReq}</td>
+                    </tr>
+                  );
+                });
+
+                return [termHeader, ...termRows];
+              })}
+              {groupedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                    No curriculum evaluation records found.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-blue-200/60 bg-slate-50/70 px-4 py-2.5 text-xs dark:border-blue-400/10 dark:bg-white/5">
+          <span className="text-slate-600 dark:text-slate-300">Count: {summary.total}</span>
+          <span className="text-slate-400">|</span>
+          <span className="text-emerald-700 dark:text-emerald-300">Passed/Credited: {summary.passed}</span>
+          <span className="text-slate-400">|</span>
+          <span className="text-rose-700 dark:text-rose-300">Failed: {summary.failed}</span>
+          <span className="text-slate-400">|</span>
+          <span className="text-amber-700 dark:text-amber-300">Unfinished: {summary.unfinished}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlaceholderSection({ section }: { section: Section }) {
   const cards = placeholderCards[section as keyof typeof placeholderCards];
   return (
@@ -609,85 +847,7 @@ export function SectionContent({ section }: { section: Section }) {
   }
 
   if (section === "academic-evaluation") {
-    const groupedEvaluation = evaluationRows.reduce<
-      Array<{ term: string; rows: typeof evaluationRows }>
-    >((acc, row) => {
-      const term = String(row[0]);
-      const last = acc[acc.length - 1];
-      if (!last || last.term !== term) {
-        acc.push({ term, rows: [row] as typeof evaluationRows });
-      } else {
-        last.rows.push(row);
-      }
-      return acc;
-    }, []);
-
-    return (
-      <div className="space-y-4 sm:space-y-5">
-        <SectionHeader title="Academic Evaluation" subtitle="Track passed, credited, and pending curriculum subjects." />
-        <div className="overflow-hidden rounded-2xl border border-blue-700/50 bg-white shadow-sm dark:border-blue-400/20 dark:bg-slate-900">
-          <div className="overflow-x-auto">
-            <table className="min-w-[980px] w-full table-fixed text-sm">
-              <thead className="bg-blue-800 text-white">
-                <tr>
-                  <th className="w-44 px-4 py-3 text-left font-semibold">Year / Term</th>
-                  <th className="w-24 px-4 py-3 text-left font-semibold">Code</th>
-                  <th className="px-4 py-3 text-left font-semibold">Course Title</th>
-                  <th className="w-44 px-4 py-3 text-left font-semibold">Pre-Req</th>
-                  <th className="w-28 px-4 py-3 text-left font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedEvaluation.map((group, groupIndex) =>
-                  group.rows.map((r, rowIndex) => {
-                    const status = String(r[4]);
-                    const isCredited = status === "Credited";
-                    const isPassed = status === "Passed";
-                    const rowClass =
-                      (groupIndex + rowIndex) % 2 === 0
-                        ? "bg-white dark:bg-slate-900"
-                        : "bg-slate-50/70 dark:bg-white/5";
-                    const statusTextClass = isCredited
-                      ? "text-blue-600 dark:text-blue-300"
-                      : isPassed
-                        ? "text-emerald-600 dark:text-emerald-300"
-                        : "text-slate-700 dark:text-slate-200";
-
-                    return (
-                      <tr
-                        key={`${r[0]}-${r[1]}`}
-                        className={`${rowClass} border-b border-blue-200/60 dark:border-blue-400/10`}
-                      >
-                        {rowIndex === 0 && (
-                          <td
-                            rowSpan={group.rows.length}
-                            className="whitespace-pre-line border-r border-blue-200/70 bg-blue-800 px-4 py-3 align-middle font-semibold text-white dark:border-blue-400/10"
-                          >
-                            {group.term.replace(" - ", " -\n")}
-                          </td>
-                        )}
-                        <td className="px-4 py-3 align-top text-slate-700 dark:text-slate-200">
-                          {r[1]}
-                        </td>
-                        <td className="px-4 py-3 align-top text-slate-700 dark:text-slate-200">
-                          {r[2]}
-                        </td>
-                        <td className="px-4 py-3 align-top text-slate-600 dark:text-slate-300">
-                          {r[3]}
-                        </td>
-                        <td className={`px-4 py-3 align-top font-medium ${statusTextClass}`}>
-                          {status}
-                        </td>
-                      </tr>
-                    );
-                  }),
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
+    return <AcademicEvaluationMatrixSection />;
   }
 
   if (section === "student-ledger") {

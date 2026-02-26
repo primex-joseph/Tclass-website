@@ -52,8 +52,79 @@ type SubjectRow = {
   prerequisite_code: string;
 };
 
-const programs = ["BTVTED", "ICT Diploma", "Hospitality NCII", "Forklift NCII"];
+type SubjectPresetRow = Omit<SubjectRow, "id">;
+
+const programs = ["BS Information Technology", "BTVTED", "ICT Diploma", "Hospitality NCII", "Forklift NCII"];
 const mkRow = (): SubjectRow => ({ id: Date.now() + Math.random(), year_level: 1, semester: 1, code: "", title: "", units: "3", prerequisite_code: "" });
+
+const BSIT_TESDA_CURRICULUM_PRESET: SubjectPresetRow[] = [
+  { year_level: 1, semester: 1, code: "CC101", title: "Introduction to Computing", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "CC102", title: "Computer Programming 1", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "GE1", title: "Purposive Communication", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "IT25", title: "Multimedia Systems", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "HCI101", title: "Introduction to Human Computer Interaction 1", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "GE6", title: "Ethics", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "GE2", title: "Reading in Philippine History", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "PE1", title: "Physical Activities Toward Health and Fitness 1", units: "2", prerequisite_code: "" },
+  { year_level: 1, semester: 1, code: "NSTP1", title: "Civic Welfare Training Program 1", units: "3", prerequisite_code: "" },
+
+  { year_level: 1, semester: 2, code: "HCI102", title: "Human and Computer Interaction 2", units: "3", prerequisite_code: "HCI101" },
+  { year_level: 1, semester: 2, code: "CC103", title: "Computer Programming 2", units: "3", prerequisite_code: "CC102" },
+  { year_level: 1, semester: 2, code: "CC104", title: "Data Structure and Algorithm", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "WS101", title: "Web Systems and Technologies 1", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "ELEC1", title: "Elective 1", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "GE5", title: "Science, Technology and Society", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "MS102", title: "Quantitative Methods", units: "3", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "PE2", title: "Physical Activities Toward Health and Fitness 2", units: "2", prerequisite_code: "" },
+  { year_level: 1, semester: 2, code: "NSTP2", title: "Civic Welfare Training Program 2", units: "3", prerequisite_code: "NSTP1" },
+
+  { year_level: 1, semester: 3, code: "SIL1", title: "Supervised-Industry Learning 1", units: "3", prerequisite_code: "" },
+
+  { year_level: 2, semester: 1, code: "PT101", title: "Platform Technologies", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 1, code: "GE3", title: "Mathematics in the Modern World", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 1, code: "WS102", title: "Web Systems and Technologies 2", units: "3", prerequisite_code: "WS101" },
+  { year_level: 2, semester: 1, code: "CC105", title: "Information Management", units: "3", prerequisite_code: "CC103" },
+  { year_level: 2, semester: 1, code: "PF101", title: "Object-Oriented Programming", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 1, code: "SP101", title: "Social and Professional Issues", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 1, code: "GE4", title: "Understanding the Self", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 1, code: "PE3", title: "Physical Activities Toward Health and Fitness 3", units: "2", prerequisite_code: "" },
+
+  { year_level: 2, semester: 2, code: "IS104", title: "System Analysis and Designs", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 2, code: "IM101", title: "Database Management Systems", units: "3", prerequisite_code: "CC105" },
+  { year_level: 2, semester: 2, code: "SIA101", title: "System Integration and Architecture", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 2, code: "CC106", title: "Applications Development and Emerging Technologies", units: "3", prerequisite_code: "CC105" },
+  { year_level: 2, semester: 2, code: "NET101", title: "Networking 1", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 2, code: "ELEC2", title: "Elective 2", units: "3", prerequisite_code: "" },
+  { year_level: 2, semester: 2, code: "PE4", title: "Physical Activities Toward Health and Fitness 4", units: "2", prerequisite_code: "" },
+
+  { year_level: 2, semester: 3, code: "SIL2", title: "Supervised-Industry Learning 2", units: "3", prerequisite_code: "SIL1" },
+
+  { year_level: 3, semester: 1, code: "RIZAL", title: "Life and Works of Rizal", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "GE7", title: "The Contemporary World", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "SA101", title: "Systems Administration and Maintenance", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "IAS101", title: "Information Assurance and Security 1", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "NET102", title: "Networking 2", units: "3", prerequisite_code: "NET101" },
+  { year_level: 3, semester: 1, code: "IPT101", title: "Integrative Programming and Technologies", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "CAP101", title: "Capstone Project and Research 1", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 1, code: "ELEC3", title: "Elective 3", units: "3", prerequisite_code: "" },
+
+  { year_level: 3, semester: 2, code: "CAP102", title: "Capstone Project and Research 2", units: "3", prerequisite_code: "CAP101" },
+  { year_level: 3, semester: 2, code: "FELEC1", title: "Fundamental of BPO 1 (Free Elective 1)", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 2, code: "IT55", title: "Advance Web Development", units: "3", prerequisite_code: "" },
+  { year_level: 3, semester: 2, code: "IAS102", title: "Information Assurance and Security 2", units: "3", prerequisite_code: "IAS101" },
+
+  { year_level: 4, semester: 1, code: "ORIENT1", title: "Student Life and Culture", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 1, code: "THEO1", title: "Moral Theology", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 1, code: "ORIENT2", title: "Kapampangan Language and Culture", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 1, code: "THEO2", title: "The Church and Vatican II", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 1, code: "FIL1", title: "Mga Natatanging Diskurso sa Wika at Panitikan", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 1, code: "IT64", title: "Game Development", units: "3", prerequisite_code: "" },
+
+  { year_level: 4, semester: 2, code: "TECHENG1", title: "Technical English 1", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 2, code: "THEO3", title: "Basic Christian Religious Education", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 2, code: "FIL2", title: "Sanaysay at Talumpati", units: "3", prerequisite_code: "" },
+  { year_level: 4, semester: 2, code: "THEO4", title: "Introduction to Liturgy and Lay Ministry", units: "3", prerequisite_code: "" },
+];
 
 export default function AdminCurriculumPage() {
   const router = useRouter();
@@ -72,7 +143,6 @@ export default function AdminCurriculumPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activatingId, setActivatingId] = useState<number | null>(null);
-  const [extractingPdf, setExtractingPdf] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
@@ -114,6 +184,19 @@ export default function AdminCurriculumPage() {
   const patchRow = (id: number, patch: Partial<SubjectRow>) => setSubjectRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const addRow = () => setSubjectRows((rows) => [...rows, mkRow()]);
   const removeRow = (id: number) => setSubjectRows((rows) => (rows.length > 1 ? rows.filter((r) => r.id !== id) : rows));
+  const loadBsitPreset = () => {
+    setProgramName("BS Information Technology");
+    setLabel("BSIT TESDA Curriculum");
+    setVersion("v1");
+    setSubjectRows(
+      BSIT_TESDA_CURRICULUM_PRESET.map((row, index) => ({
+        ...row,
+        id: Date.now() + index,
+      }))
+    );
+    setBulkRowsText("");
+    toast.success(`Loaded BSIT curriculum preset (${BSIT_TESDA_CURRICULUM_PRESET.length} subjects). Upload PDF and save to activate.`);
+  };
 
   const parseBulk = () => {
     const parsed = bulkRowsText
@@ -135,132 +218,6 @@ export default function AdminCurriculumPage() {
     if (!parsed.length) return toast.error("No valid rows parsed.");
     setSubjectRows(parsed);
     toast.success(`Parsed ${parsed.length} rows.`);
-  };
-
-  const detectTermContext = (line: string, current: { year: number; sem: number }) => {
-    const lower = line.toLowerCase();
-    let year = current.year;
-    let sem = current.sem;
-
-    if (/\b1st year\b|\bfirst year\b/.test(lower)) year = 1;
-    else if (/\b2nd year\b|\bsecond year\b/.test(lower)) year = 2;
-    else if (/\b3rd year\b|\bthird year\b/.test(lower)) year = 3;
-    else if (/\b4th year\b|\bfourth year\b/.test(lower)) year = 4;
-
-    if (/\b1st sem\b|\b1st semester\b|\bfirst semester\b/.test(lower)) sem = 1;
-    else if (/\b2nd sem\b|\b2nd semester\b|\bsecond semester\b/.test(lower)) sem = 2;
-    else if (/\bsummer\b/.test(lower)) sem = 3;
-
-    return { year, sem };
-  };
-
-  const parseCurriculumTextToRows = (text: string): SubjectRow[] => {
-    const lines = text
-      .split(/\r?\n/)
-      .map((l) => l.replace(/\s+/g, " ").trim())
-      .filter(Boolean);
-
-    const rows: SubjectRow[] = [];
-    let ctx = { year: 1, sem: 1 };
-
-    for (const line of lines) {
-      ctx = detectTermContext(line, ctx);
-
-      // Examples handled:
-      // TEC302 Research 2 - Undergraduate Thesis 3
-      // GEC 5 Purposive Communication 3
-      const match = line.match(/^([A-Z]{2,}(?:[\s-]?[A-Z0-9]+){0,3})\s+(.+?)\s+(\d+(?:\.\d+)?)$/);
-      if (!match) continue;
-
-      let code = match[1].trim();
-      const title = match[2].trim();
-      const units = match[3].trim();
-
-      if (!/[A-Z]/.test(code) || !/\d/.test(code)) continue;
-      if (title.length < 3) continue;
-
-      code = code.replace(/\s{2,}/g, " ");
-
-      rows.push({
-        id: Date.now() + rows.length,
-        year_level: ctx.year,
-        semester: ctx.sem,
-        code,
-        title,
-        units,
-        prerequisite_code: "",
-      });
-    }
-
-    // Deduplicate by year/sem/code/title
-    const seen = new Set<string>();
-    return rows.filter((r) => {
-      const key = `${r.year_level}|${r.semester}|${r.code.toUpperCase()}|${r.title.toUpperCase()}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
-
-  const extractPdfToRows = async () => {
-    if (!selectedFile) {
-      toast.error("Upload/select a PDF first.");
-      return;
-    }
-
-    try {
-      setExtractingPdf(true);
-      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-        pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-      }
-      const fileBuffer = await selectedFile.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({
-        data: new Uint8Array(fileBuffer),
-      } as never);
-      const pdf = await loadingTask.promise;
-
-      const pageTexts: string[] = [];
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const items = (textContent.items as Array<{ str?: string; transform?: number[] }>)
-          .filter((i) => typeof i.str === "string" && i.str.trim());
-
-        // Group by Y position to reconstruct row-ish lines
-        const lineMap = new Map<number, Array<{ x: number; text: string }>>();
-        for (const item of items) {
-          const y = Math.round((item.transform?.[5] ?? 0) / 2) * 2;
-          const x = item.transform?.[4] ?? 0;
-          const list = lineMap.get(y) ?? [];
-          list.push({ x, text: item.str!.trim() });
-          lineMap.set(y, list);
-        }
-
-        const lines = [...lineMap.entries()]
-          .sort((a, b) => b[0] - a[0])
-          .map(([, list]) => list.sort((a, b) => a.x - b.x).map((v) => v.text).join(" "))
-          .map((line) => line.replace(/\s+/g, " ").trim())
-          .filter(Boolean);
-
-        pageTexts.push(lines.join("\n"));
-      }
-
-      const extractedText = pageTexts.join("\n");
-      setBulkRowsText(extractedText);
-
-      const inferredRows = parseCurriculumTextToRows(extractedText);
-      if (inferredRows.length) {
-        setSubjectRows(inferredRows);
-        toast.success(`Extracted ${inferredRows.length} subject rows from PDF. Review before saving.`);
-      } else {
-        toast("PDF text extracted. Review text and use Quick Paste format if needed.", { icon: "ℹ️" });
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? `PDF extraction failed: ${e.message}` : "PDF extraction failed.");
-    } finally {
-      setExtractingPdf(false);
-    }
   };
 
   const saveCurriculum = async () => {
@@ -383,6 +340,13 @@ export default function AdminCurriculumPage() {
               <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
                 <CardHeader><CardTitle className="text-slate-900 dark:text-slate-100">Create Curriculum Version</CardTitle><CardDescription className="text-slate-600 dark:text-slate-400">Student auto-enlistment reflects the active version per program.</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 dark:border-blue-400/20 dark:bg-blue-500/10">
+                    <Badge className="bg-blue-600 text-white">Preset</Badge>
+                    <p className="text-sm text-blue-900 dark:text-blue-100">Load the provided TESDA-style BS Information Technology curriculum into subject rows.</p>
+                    <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={loadBsitPreset}>
+                      Load IT Curriculum Preset
+                    </Button>
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Program</Label><Select value={programName} onValueChange={setProgramName}><SelectTrigger className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80"><SelectValue /></SelectTrigger><SelectContent>{programs.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                     <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Effective AY</Label><Input value={effectiveAy} onChange={(e) => setEffectiveAy(e.target.value)} className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80" /></div>
@@ -394,14 +358,9 @@ export default function AdminCurriculumPage() {
                   <div className="space-y-2">
                     <Label className="text-slate-700 dark:text-slate-300">Curriculum PDF</Label>
                     <Input type="file" accept=".pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} className="border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-200" />
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" onClick={extractPdfToRows} disabled={!selectedFile || extractingPdf}>
-                        {extractingPdf ? "Extracting PDF..." : "Extract PDF to Rows"}
-                      </Button>
-                      <p className="self-center text-xs text-slate-500 dark:text-slate-400">
-                        Attempts auto-detect from PDF text. Always review the rows before saving.
-                      </p>
-                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      PDF is stored for reference only. Enter/paste curriculum subjects manually below.
+                    </p>
                   </div>
                   <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Quick Paste Rows (optional)</Label><Textarea rows={3} value={bulkRowsText} onChange={(e) => setBulkRowsText(e.target.value)} placeholder="year, sem, code, title, units, prereq(optional)" className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80" /><Button type="button" variant="outline" onClick={parseBulk}>Parse Paste</Button></div>
 
@@ -484,3 +443,4 @@ export default function AdminCurriculumPage() {
     </div>
   );
 }
+

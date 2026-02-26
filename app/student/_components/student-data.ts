@@ -23,6 +23,7 @@ export type Section =
   | "enrollment-history"
   | "report-of-grades"
   | "academic-evaluation"
+  | "student-enrollment"
   | "student-ledger"
   | "online-services"
   | "community"
@@ -53,6 +54,7 @@ export const sectionTitle: Record<Section, string> = {
   "enrollment-history": "Enrollment History",
   "report-of-grades": "Report of Grades",
   "academic-evaluation": "Academic Evaluation",
+  "student-enrollment": "Enrollment",
   "student-ledger": "Student Ledger",
   "online-services": "Online Services",
   community: "Community",
@@ -82,7 +84,10 @@ export const navItems: NavItem[] = [
   {
     label: "Online Services",
     icon: Globe,
-    children: [{ label: "Student Ledger", icon: Wallet, section: "student-ledger" }],
+    children: [
+      { label: "Enrollment", icon: ClipboardList, section: "student-enrollment" },
+      { label: "Student Ledger", icon: Wallet, section: "student-ledger" },
+    ],
   },
 ];
 
@@ -96,6 +101,7 @@ export const mobileTabs: { label: string; icon: ElementType; section: Section }[
 export const mobileMoreSections: Section[] = [
   "enrollment-history",
   "academic-evaluation",
+  "student-enrollment",
   "student-ledger",
   "online-services",
 ];
