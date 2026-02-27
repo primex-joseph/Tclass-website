@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
+  ArrowRightLeft,
   BarChart3,
   BookOpen,
   Building2,
   Calendar,
   CheckCircle,
+  Eye,
   FileText,
   MessageSquare,
   Save,
@@ -34,7 +36,7 @@ type Section = { id: number; section_code: string; program_name: string; year_le
 type Course = { id: number; code: string; title: string; units: number; year_level: number; semester: number; program_key: string };
 
 type ScheduleItem = {
-  id: number;
+  id: number | null;
   period_id: number | null;
   course_id: number;
   course_code: string;
@@ -76,6 +78,16 @@ const toProgramLabel = (programKey: string) => {
 };
 
 const normalizeProgram = (value: string) => value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+const inferSemesterFromPeriodName = (name?: string | null): number | null => {
+  const value = (name ?? "").toLowerCase();
+  if (!value) return null;
+  if (value.includes("1st semester")) return 1;
+  if (value.includes("2nd semester")) return 2;
+  if (value.includes("summer")) return 3;
+  return null;
+};
+
+const getRowKey = (row: ScheduleItem) => (row.id ? `o-${row.id}` : `c-${row.course_id}`);
 
 export default function AdminClassSchedulingPage() {
   const router = useRouter();
@@ -86,12 +98,15 @@ export default function AdminClassSchedulingPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [rows, setRows] = useState<ScheduleItem[]>([]);
-  const [edits, setEdits] = useState<Record<number, RowEdit>>({});
+  const [edits, setEdits] = useState<Record<string, RowEdit>>({});
   const [loading, setLoading] = useState(true);
   const [savingAll, setSavingAll] = useState(false);
-  const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
+  const [rollingPeriod, setRollingPeriod] = useState(false);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
+  const [pastPeriodFilter, setPastPeriodFilter] = useState<string>("");
+  const [viewPastRecords, setViewPastRecords] = useState(false);
   const [programFilter, setProgramFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
@@ -120,6 +135,64 @@ export default function AdminClassSchedulingPage() {
     return years;
   }, [courses, programFilter]);
 
+  const selectedPeriod = useMemo(
+    () => periods.find((p) => String(p.id) === periodFilter) ?? null,
+    [periodFilter, periods]
+  );
+  const targetSemester = useMemo(
+    () => inferSemesterFromPeriodName(selectedPeriod?.name ?? null),
+    [selectedPeriod]
+  );
+  const isFilterReady = useMemo(
+    () => programFilter !== "all" && yearFilter !== "all",
+    [programFilter, yearFilter]
+  );
+
+  const activePeriod = useMemo(
+    () => periods.find((p) => Number(p.is_active) === 1) ?? null,
+    [periods]
+  );
+
+  const extractAy = useCallback((name: string) => {
+    const match = name.match(/AY\s+(\d{4}-\d{4})/i);
+    return match?.[1] ?? null;
+  }, []);
+
+  const activeAy = useMemo(() => (activePeriod ? extractAy(activePeriod.name) : null), [activePeriod, extractAy]);
+
+  const currentAyPeriods = useMemo(() => {
+    if (!activeAy) return periods;
+    return periods.filter((p) => extractAy(p.name) === activeAy);
+  }, [activeAy, extractAy, periods]);
+
+  const pastAyPeriods = useMemo(() => {
+    if (!activeAy) return [];
+    return periods.filter((p) => extractAy(p.name) !== activeAy);
+  }, [activeAy, extractAy, periods]);
+
+  useEffect(() => {
+    if (viewPastRecords) return;
+    if (periodFilter === "all") {
+      if (activePeriod) setPeriodFilter(String(activePeriod.id));
+      return;
+    }
+    if (!currentAyPeriods.some((p) => String(p.id) === periodFilter)) {
+      if (activePeriod) setPeriodFilter(String(activePeriod.id));
+      else setPeriodFilter("all");
+    }
+  }, [activePeriod, currentAyPeriods, periodFilter, viewPastRecords]);
+
+  useEffect(() => {
+    if (!viewPastRecords) return;
+    if (!pastAyPeriods.length) {
+      setPastPeriodFilter("");
+      return;
+    }
+    if (!pastPeriodFilter || !pastAyPeriods.some((p) => String(p.id) === pastPeriodFilter)) {
+      setPastPeriodFilter(String(pastAyPeriods[0].id));
+    }
+  }, [pastAyPeriods, pastPeriodFilter, viewPastRecords]);
+
   const loadMasters = useCallback(async () => {
     const res = await apiFetch("/admin/scheduling/masters");
     const payload = res as {
@@ -138,7 +211,8 @@ export default function AdminClassSchedulingPage() {
 
   const loadItems = useCallback(async () => {
     const qs = new URLSearchParams();
-    if (periodFilter !== "all") qs.set("period_id", periodFilter);
+    const effectivePeriodFilter = viewPastRecords ? pastPeriodFilter : periodFilter;
+    if (effectivePeriodFilter && effectivePeriodFilter !== "all") qs.set("period_id", effectivePeriodFilter);
     if (sectionFilter !== "all") qs.set("section_id", sectionFilter);
     if (searchQuery.trim()) qs.set("search", searchQuery.trim());
 
@@ -147,8 +221,8 @@ export default function AdminClassSchedulingPage() {
     const items = payload.items ?? [];
     setRows(items);
     setEdits(
-      items.reduce<Record<number, RowEdit>>((acc, item) => {
-        acc[item.id] = {
+      items.reduce<Record<string, RowEdit>>((acc, item) => {
+        acc[getRowKey(item)] = {
           section_id: item.section_id ? String(item.section_id) : "",
           teacher_id: item.teacher_id ? String(item.teacher_id) : "",
           room_id: item.room_id ? String(item.room_id) : "",
@@ -159,7 +233,7 @@ export default function AdminClassSchedulingPage() {
         return acc;
       }, {})
     );
-  }, [periodFilter, searchQuery, sectionFilter]);
+  }, [pastPeriodFilter, periodFilter, searchQuery, sectionFilter, viewPastRecords]);
 
   const loadAll = useCallback(async () => {
     try {
@@ -176,11 +250,63 @@ export default function AdminClassSchedulingPage() {
     loadAll();
   }, [loadAll]);
 
+  const curriculumRows = useMemo(() => {
+    if (!isFilterReady) return [] as ScheduleItem[];
+    const coursesInScope = courses
+      .filter((course) => {
+        if (programFilter !== "all" && course.program_key !== programFilter) return false;
+        if (yearFilter !== "all" && course.year_level !== Number(yearFilter)) return false;
+        if (targetSemester && course.semester !== targetSemester) return false;
+        return true;
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+
+    const byCourse = new Map<number, ScheduleItem>();
+    for (const row of rows) {
+      if (!byCourse.has(row.course_id)) byCourse.set(row.course_id, row);
+    }
+
+    return coursesInScope.map((course) => {
+      const existing = byCourse.get(course.id);
+      if (existing) return existing;
+      return {
+        id: null,
+        period_id: selectedPeriod?.id ?? activePeriod?.id ?? null,
+        course_id: course.id,
+        course_code: course.code,
+        course_title: course.title,
+        units: Number(course.units),
+        section_id: null,
+        teacher_id: null,
+        room_id: null,
+        day_of_week: null,
+        start_time: null,
+        end_time: null,
+        schedule_text: null,
+        capacity: 40,
+        enrolled_count: 0,
+        slots_left: 40,
+        section_code: null,
+        teacher_name: null,
+        room_code: null,
+      };
+    });
+  }, [activePeriod, courses, isFilterReady, programFilter, rows, selectedPeriod, targetSemester, yearFilter]);
+
+  const visibleRows = useMemo(() => {
+    if (!searchQuery.trim()) return curriculumRows;
+    const keyword = searchQuery.trim().toLowerCase();
+    return curriculumRows.filter((row) =>
+      row.course_code.toLowerCase().includes(keyword) ||
+      row.course_title.toLowerCase().includes(keyword)
+    );
+  }, [curriculumRows, searchQuery]);
+
   const changedIds = useMemo(
     () =>
-      rows
+      visibleRows
         .filter((row) => {
-          const edit = edits[row.id];
+          const edit = edits[getRowKey(row)];
           if (!edit) return false;
           return (
             edit.section_id !== (row.section_id ? String(row.section_id) : "") ||
@@ -191,35 +317,35 @@ export default function AdminClassSchedulingPage() {
             edit.end_time !== (row.end_time ? row.end_time.slice(0, 5) : "")
           );
         })
-        .map((row) => row.id),
-    [edits, rows]
+        .map((row) => getRowKey(row)),
+    [edits, visibleRows]
   );
 
-  const patchEdit = (offeringId: number, patch: Partial<RowEdit>) => {
+  const patchEdit = (rowKey: string, patch: Partial<RowEdit>) => {
     setEdits((prev) => ({
       ...prev,
-      [offeringId]: {
-        section_id: prev[offeringId]?.section_id ?? "",
-        teacher_id: prev[offeringId]?.teacher_id ?? "",
-        room_id: prev[offeringId]?.room_id ?? "",
-        day_of_week: prev[offeringId]?.day_of_week ?? "",
-        start_time: prev[offeringId]?.start_time ?? "",
-        end_time: prev[offeringId]?.end_time ?? "",
+      [rowKey]: {
+        section_id: prev[rowKey]?.section_id ?? "",
+        teacher_id: prev[rowKey]?.teacher_id ?? "",
+        room_id: prev[rowKey]?.room_id ?? "",
+        day_of_week: prev[rowKey]?.day_of_week ?? "",
+        start_time: prev[rowKey]?.start_time ?? "",
+        end_time: prev[rowKey]?.end_time ?? "",
         ...patch,
       },
     }));
   };
 
-  const buildPayload = (offeringId: number) => {
-    const row = rows.find((x) => x.id === offeringId);
-    const edit = edits[offeringId];
+  const buildPayload = (rowKey: string) => {
+    const row = visibleRows.find((x) => getRowKey(x) === rowKey);
+    const edit = edits[rowKey];
     if (!edit) return null;
     if (!row) return null;
+    if (!row.period_id) return null;
     if (!edit.section_id || !edit.teacher_id || !edit.room_id || !edit.day_of_week || !edit.start_time || !edit.end_time) {
       return null;
     }
-    return {
-      offering_id: offeringId,
+    const payload: Record<string, unknown> = {
       period_id: row.period_id,
       course_id: row.course_id,
       section_id: Number(edit.section_id),
@@ -229,15 +355,17 @@ export default function AdminClassSchedulingPage() {
       start_time: edit.start_time,
       end_time: edit.end_time,
     };
+    if (row.id) payload.offering_id = row.id;
+    return payload;
   };
 
-  const saveOne = async (offeringId: number) => {
-    const payload = buildPayload(offeringId);
+  const saveOne = async (rowKey: string) => {
+    const payload = buildPayload(rowKey);
     if (!payload) {
       toast.error("Complete all schedule fields first.");
       return;
     }
-    setSavingIds((prev) => new Set(prev).add(offeringId));
+    setSavingIds((prev) => new Set(prev).add(rowKey));
     try {
       await apiFetch("/admin/scheduling/offerings/upsert", {
         method: "POST",
@@ -251,7 +379,7 @@ export default function AdminClassSchedulingPage() {
     } finally {
       setSavingIds((prev) => {
         const next = new Set(prev);
-        next.delete(offeringId);
+        next.delete(rowKey);
         return next;
       });
     }
@@ -279,26 +407,90 @@ export default function AdminClassSchedulingPage() {
     }
   };
 
+  const advanceToNextPeriod = async () => {
+    const proceed = window.confirm("Advance active enrollment period to the next term?");
+    if (!proceed) return;
+
+    setRollingPeriod(true);
+    try {
+      const res = await apiFetch("/admin/enrollment-periods/rollover", {
+        method: "POST",
+      });
+      const payload = res as { to?: { id?: number; name?: string } };
+      const nextId = payload.to?.id;
+      if (nextId) {
+        setPeriodFilter(String(nextId));
+        setViewPastRecords(false);
+      }
+      await loadAll();
+      toast.success(payload.to?.name ? `Active period is now ${payload.to.name}.` : "Enrollment period advanced.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to advance period.");
+    } finally {
+      setRollingPeriod(false);
+    }
+  };
+
   const filteredSections = useMemo(() => {
     return sections.filter((section) => {
       if (programFilter !== "all") {
         const sectionProgram = normalizeProgram(section.program_name);
+        const sectionCode = normalizeProgram(section.section_code);
         const selectedProgram = normalizeProgram(toProgramLabel(programFilter));
-        if (!sectionProgram.includes(selectedProgram) && !selectedProgram.includes(sectionProgram)) return false;
+        const matchesProgram =
+          sectionProgram.includes(selectedProgram) ||
+          selectedProgram.includes(sectionProgram) ||
+          sectionCode.includes(selectedProgram);
+        if (!matchesProgram) return false;
       }
       if (yearFilter !== "all" && section.year_level !== Number(yearFilter)) return false;
       return true;
     });
   }, [programFilter, sections, yearFilter]);
 
-  const visibleRows = useMemo(() => {
-    return rows.filter((row) => {
-      const course = courses.find((c) => c.id === row.course_id);
-      if (programFilter !== "all" && course?.program_key !== programFilter) return false;
-      if (yearFilter !== "all" && course?.year_level !== Number(yearFilter)) return false;
-      return true;
+  useEffect(() => {
+    if (sectionFilter === "all") return;
+    setEdits((prev) => {
+      const next = { ...prev };
+      for (const row of visibleRows) {
+        const rowKey = getRowKey(row);
+        const current = next[rowKey] ?? {
+          section_id: row.section_id ? String(row.section_id) : "",
+          teacher_id: row.teacher_id ? String(row.teacher_id) : "",
+          room_id: row.room_id ? String(row.room_id) : "",
+          day_of_week: row.day_of_week ?? "",
+          start_time: row.start_time ? row.start_time.slice(0, 5) : "",
+          end_time: row.end_time ? row.end_time.slice(0, 5) : "",
+        };
+        if (current.section_id !== sectionFilter) {
+          next[rowKey] = { ...current, section_id: sectionFilter };
+        }
+      }
+      return next;
     });
-  }, [courses, programFilter, rows, yearFilter]);
+  }, [sectionFilter, visibleRows]);
+
+  useEffect(() => {
+    if (sectionFilter !== "all") return;
+    setEdits((prev) => {
+      const next = { ...prev };
+      for (const row of visibleRows) {
+        const rowKey = getRowKey(row);
+        const current = next[rowKey] ?? {
+          section_id: row.section_id ? String(row.section_id) : "",
+          teacher_id: row.teacher_id ? String(row.teacher_id) : "",
+          room_id: row.room_id ? String(row.room_id) : "",
+          day_of_week: row.day_of_week ?? "",
+          start_time: row.start_time ? row.start_time.slice(0, 5) : "",
+          end_time: row.end_time ? row.end_time.slice(0, 5) : "",
+        };
+        if (current.section_id !== "") {
+          next[rowKey] = { ...current, section_id: "" };
+        }
+      }
+      return next;
+    });
+  }, [sectionFilter, visibleRows]);
 
   const handleLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
@@ -306,6 +498,19 @@ export default function AdminClassSchedulingPage() {
     router.push("/");
     router.refresh();
   };
+
+  const toggleViewPastRecords = () => {
+    if (!viewPastRecords && pastAyPeriods.length === 0) {
+      toast.error("No past periods found.");
+      return;
+    }
+    setViewPastRecords((prev) => !prev);
+  };
+
+  const selectedSectionCode = useMemo(
+    () => sections.find((s) => String(s.id) === sectionFilter)?.section_code ?? "",
+    [sectionFilter, sections]
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -375,10 +580,16 @@ export default function AdminClassSchedulingPage() {
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Class Scheduling</h1>
                 <p className="mt-1 text-slate-600 dark:text-slate-400">Create and manage offered schedules before students enroll.</p>
               </div>
-              <Button onClick={saveAllChanged} disabled={savingAll || changedIds.length === 0} className="gap-2">
-                <Save className="h-4 w-4" />
-                {savingAll ? "Saving..." : `Save All (${changedIds.length})`}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" onClick={advanceToNextPeriod} disabled={rollingPeriod}>
+                  <ArrowRightLeft className="h-4 w-4" />
+                  {rollingPeriod ? "Switching..." : "Advance Period"}
+                </Button>
+                <Button onClick={saveAllChanged} disabled={viewPastRecords || savingAll || changedIds.length === 0} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {savingAll ? "Saving..." : `Save All (${changedIds.length})`}
+                </Button>
+              </div>
             </div>
 
             <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
@@ -391,7 +602,7 @@ export default function AdminClassSchedulingPage() {
                   <SelectTrigger><SelectValue placeholder="Period" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Periods</SelectItem>
-                    {periods.map((p) => (
+                    {currentAyPeriods.map((p) => (
                       <SelectItem key={p.id} value={String(p.id)}>{p.name}{p.is_active ? " (Active)" : ""}</SelectItem>
                     ))}
                   </SelectContent>
@@ -413,7 +624,7 @@ export default function AdminClassSchedulingPage() {
                 <Select value={yearFilter} onValueChange={(v) => {
                   setYearFilter(v);
                   setSectionFilter("all");
-                }}>
+                }} disabled={programFilter === "all"}>
                   <SelectTrigger><SelectValue placeholder="Year" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Years</SelectItem>
@@ -424,7 +635,7 @@ export default function AdminClassSchedulingPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                <Select value={sectionFilter} onValueChange={setSectionFilter} disabled={programFilter === "all" || yearFilter === "all"}>
                   <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sections</SelectItem>
@@ -436,17 +647,55 @@ export default function AdminClassSchedulingPage() {
 
             <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
               <CardHeader>
-                <CardTitle className="text-slate-900 dark:text-slate-100">Schedule Items</CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">Conflicts are blocked by section, teacher, and room on overlapping time/day.</CardDescription>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-slate-900 dark:text-slate-100">Schedule Items</CardTitle>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      {viewPastRecords
+                        ? "Viewing past records only. Editing is disabled."
+                        : "Conflicts are blocked by section, teacher, and room on overlapping time/day."}
+                    </CardDescription>
+                    {sectionFilter !== "all" ? (
+                      <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-300">
+                        Editing subjects under one section set: {sections.find((s) => String(s.id) === sectionFilter)?.section_code ?? "Selected section"}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {viewPastRecords ? (
+                      <Select value={pastPeriodFilter || "__empty"} onValueChange={(v) => setPastPeriodFilter(v === "__empty" ? "" : v)}>
+                        <SelectTrigger className="w-[280px]"><SelectValue placeholder="Select past period" /></SelectTrigger>
+                        <SelectContent>
+                          {pastAyPeriods.length === 0 ? (
+                            <SelectItem value="__empty" disabled>No past periods</SelectItem>
+                          ) : (
+                            pastAyPeriods.map((p) => (
+                              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                    <Button type="button" variant="outline" onClick={toggleViewPastRecords} className="gap-2">
+                      <Eye className="h-4 w-4" />
+                      {viewPastRecords ? "Back to Current" : "View Past Records"}
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {loading ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">Loading schedule items...</p>
+                ) : !viewPastRecords && !isFilterReady ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Fill the filter first (Course and Year) to display subjects.
+                  </p>
                 ) : visibleRows.length === 0 ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">No schedulable rows found.</p>
                 ) : (
                   visibleRows.map((row) => {
-                    const edit = edits[row.id] ?? {
+                    const rowKey = getRowKey(row);
+                    const edit = edits[rowKey] ?? {
                       section_id: "",
                       teacher_id: "",
                       room_id: "",
@@ -454,53 +703,49 @@ export default function AdminClassSchedulingPage() {
                       start_time: "",
                       end_time: "",
                     };
-                    const isSaving = savingIds.has(row.id);
+                    const isSaving = savingIds.has(rowKey);
                     return (
-                      <div key={row.id} className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-slate-950/50">
+                      <div key={rowKey} className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-slate-950/50">
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{row.course_code} - {row.course_title}</p>
                             <p className="text-xs text-slate-600 dark:text-slate-300">{row.units} unit(s) • {row.enrolled_count}/{row.capacity} enrolled • {row.slots_left} slot(s) left</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">Offering #{row.id}</Badge>
+                            <Badge variant="outline">{row.id ? `Offering #${row.id}` : "Not yet scheduled"}</Badge>
                             {row.schedule_text ? <Badge variant="outline">{row.schedule_text}</Badge> : null}
                           </div>
                         </div>
                         <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-7">
-                          <Select value={edit.section_id || "__empty"} onValueChange={(v) => patchEdit(row.id, { section_id: v === "__empty" ? "" : v })}>
-                            <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__empty">Section</SelectItem>
-                              {sections.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.section_code}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <Select value={edit.teacher_id || "__empty"} onValueChange={(v) => patchEdit(row.id, { teacher_id: v === "__empty" ? "" : v })}>
-                            <SelectTrigger><SelectValue placeholder="Teacher" /></SelectTrigger>
+                          <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 dark:border-white/10 dark:bg-slate-900/50 dark:text-slate-200">
+                            {sectionFilter !== "all" ? (selectedSectionCode || "Selected section") : "Choose section"}
+                          </div>
+                          <Select value={edit.teacher_id || "__empty"} onValueChange={(v) => patchEdit(rowKey, { teacher_id: v === "__empty" ? "" : v })}>
+                            <SelectTrigger disabled={viewPastRecords}><SelectValue placeholder="Teacher" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__empty">Teacher</SelectItem>
                               {teachers.map((t) => <SelectItem key={t.id} value={String(t.id)}>{t.full_name}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Select value={edit.room_id || "__empty"} onValueChange={(v) => patchEdit(row.id, { room_id: v === "__empty" ? "" : v })}>
-                            <SelectTrigger><SelectValue placeholder="Room" /></SelectTrigger>
+                          <Select value={edit.room_id || "__empty"} onValueChange={(v) => patchEdit(rowKey, { room_id: v === "__empty" ? "" : v })}>
+                            <SelectTrigger disabled={viewPastRecords}><SelectValue placeholder="Room" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__empty">Room</SelectItem>
                               {rooms.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.room_code}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Select value={edit.day_of_week || "__empty"} onValueChange={(v) => patchEdit(row.id, { day_of_week: v === "__empty" ? "" : v })}>
-                            <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
+                          <Select value={edit.day_of_week || "__empty"} onValueChange={(v) => patchEdit(rowKey, { day_of_week: v === "__empty" ? "" : v })}>
+                            <SelectTrigger disabled={viewPastRecords}><SelectValue placeholder="Day" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__empty">Day</SelectItem>
                               {days.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Input type="time" value={edit.start_time} onChange={(e) => patchEdit(row.id, { start_time: e.target.value })} />
-                          <Input type="time" value={edit.end_time} onChange={(e) => patchEdit(row.id, { end_time: e.target.value })} />
-                          <Button onClick={() => saveOne(row.id)} disabled={isSaving} className="gap-2">
+                          <Input type="time" value={edit.start_time} onChange={(e) => patchEdit(rowKey, { start_time: e.target.value })} disabled={viewPastRecords} />
+                          <Input type="time" value={edit.end_time} onChange={(e) => patchEdit(rowKey, { end_time: e.target.value })} disabled={viewPastRecords} />
+                          <Button onClick={() => saveOne(rowKey)} disabled={viewPastRecords || isSaving} className="gap-2">
                             <Save className="h-4 w-4" />
-                            {isSaving ? "Saving..." : "Save"}
+                            {viewPastRecords ? "View Only" : isSaving ? "Saving..." : "Save"}
                           </Button>
                         </div>
                       </div>

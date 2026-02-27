@@ -11,6 +11,7 @@ import {
   Building2,
   Calendar,
   CheckCircle,
+  Eye,
   FileText,
   MessageSquare,
   Plus,
@@ -26,6 +27,7 @@ import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -54,6 +56,15 @@ type SubjectRow = {
 };
 
 type SubjectPresetRow = Omit<SubjectRow, "id">;
+type CurriculumSubjectView = {
+  id: number;
+  year_level: number;
+  semester: number;
+  code: string;
+  title: string;
+  units: string | number;
+  prerequisite_code: string | null;
+};
 
 const programs = ["BS Information Technology", "BTVTED", "ICT Diploma", "Hospitality NCII", "Forklift NCII"];
 const mkRow = (): SubjectRow => ({ id: Date.now() + Math.random(), year_level: 1, semester: 1, code: "", title: "", units: "3", prerequisite_code: "" });
@@ -141,6 +152,10 @@ export default function AdminCurriculumPage() {
   const [bulkRowsText, setBulkRowsText] = useState("");
   const [subjectRows, setSubjectRows] = useState<SubjectRow[]>([mkRow()]);
   const [curricula, setCurricula] = useState<CurriculumVersion[]>([]);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewingCurriculum, setViewingCurriculum] = useState<CurriculumVersion | null>(null);
+  const [viewSubjects, setViewSubjects] = useState<CurriculumSubjectView[]>([]);
+  const [viewLoading, setViewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activatingId, setActivatingId] = useState<number | null>(null);
@@ -276,6 +291,21 @@ export default function AdminCurriculumPage() {
       toast.error(e instanceof Error ? e.message : "Failed to activate.");
     } finally {
       setActivatingId(null);
+    }
+  };
+
+  const openViewCurriculum = async (curriculum: CurriculumVersion) => {
+    try {
+      setViewLoading(true);
+      setViewingCurriculum(curriculum);
+      setViewOpen(true);
+      const res = await apiFetch(`/admin/curricula/${curriculum.id}/subjects`);
+      setViewSubjects((res as { subjects?: CurriculumSubjectView[] }).subjects ?? []);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load curriculum subjects.");
+      setViewOpen(false);
+    } finally {
+      setViewLoading(false);
     }
   };
 
@@ -430,6 +460,10 @@ export default function AdminCurriculumPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge className={c.is_active ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"}>{c.is_active ? "active" : "draft"}</Badge>
+                          <Button type="button" size="sm" variant="outline" onClick={() => openViewCurriculum(c)} className="gap-1">
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
                           <Button type="button" size="sm" variant="outline" disabled={c.is_active || activatingId === c.id} onClick={() => activateCurriculum(c.id)}>{activatingId === c.id ? "Activating..." : "Set Active"}</Button>
                         </div>
                       </div>
@@ -440,6 +474,49 @@ export default function AdminCurriculumPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{viewingCurriculum?.label ?? "Curriculum"} - Subjects</DialogTitle>
+                <DialogDescription>
+                  {viewingCurriculum ? `${viewingCurriculum.program_name} · AY ${viewingCurriculum.effective_ay ?? "-"} · ${viewingCurriculum.version}` : "Curriculum subjects"}
+                </DialogDescription>
+              </DialogHeader>
+              {viewLoading ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">Loading subjects...</p>
+              ) : !viewSubjects.length ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No subjects found for this curriculum.</p>
+              ) : (
+                <div className="max-h-[60vh] overflow-auto rounded-lg border border-slate-200 dark:border-white/10">
+                  <table className="min-w-full text-sm">
+                    <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/90">
+                      <tr className="text-left text-slate-600 dark:text-slate-300">
+                        <th className="px-3 py-2">Year</th>
+                        <th className="px-3 py-2">Sem</th>
+                        <th className="px-3 py-2">Code</th>
+                        <th className="px-3 py-2">Title</th>
+                        <th className="px-3 py-2">Units</th>
+                        <th className="px-3 py-2">Prereq</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewSubjects.map((subject) => (
+                        <tr key={subject.id} className="border-t border-slate-100 dark:border-white/10">
+                          <td className="px-3 py-2">{subject.year_level}</td>
+                          <td className="px-3 py-2">{subject.semester}</td>
+                          <td className="px-3 py-2 font-medium">{subject.code}</td>
+                          <td className="px-3 py-2">{subject.title}</td>
+                          <td className="px-3 py-2">{subject.units}</td>
+                          <td className="px-3 py-2">{subject.prerequisite_code || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
