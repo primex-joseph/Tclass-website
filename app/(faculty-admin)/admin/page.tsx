@@ -1325,9 +1325,9 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
         }
       }
       const sessionEmail = sessionUser?.email?.toLowerCase() ?? "";
-      const withDynamicStatus = loaded.map((row) => ({
+      const withDynamicStatus: UserItem[] = loaded.map((row) => ({
         ...row,
-        status: sessionEmail && row.email.toLowerCase() === sessionEmail ? "active" : "inactive",
+        status: (sessionEmail && row.email.toLowerCase() === sessionEmail ? "active" : "inactive") as UserItem["status"],
       }));
       setUsers(withDynamicStatus);
     } catch {

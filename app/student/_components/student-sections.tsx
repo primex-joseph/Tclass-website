@@ -1291,7 +1291,7 @@ function ClassScheduleSection() {
 }
 
 function PlaceholderSection({ section }: { section: Section }) {
-  const cards = placeholderCards[section as keyof typeof placeholderCards] ?? [];
+  const cards = (placeholderCards[section as keyof typeof placeholderCards] ?? []) as unknown as Array<{ title: string; desc: string; icon: ElementType }>;
   return (
     <div className="space-y-4 sm:space-y-5">
       <SectionHeader title={sectionTitle[section]} subtitle="Static page cards to define the structure first, then wire real endpoints." />

@@ -398,8 +398,8 @@ export default function AdminClassSchedulingPage() {
   }, [edits, visibleRows]);
 
   const localConflictMap = useMemo(() => {
-    const candidates: PlannedSchedule[] = visibleRows
-      .map((row) => {
+    const candidates = visibleRows
+      .map((row): PlannedSchedule | null => {
         const rowKey = getRowKey(row);
         const edit = edits[rowKey];
         if (isEditBlank(edit) || !row.period_id) return null;
@@ -416,9 +416,9 @@ export default function AdminClassSchedulingPage() {
           day_of_week: edit.day_of_week,
           start_time: edit.start_time,
           end_time: edit.end_time,
-        } satisfies PlannedSchedule;
+        };
       })
-      .filter((v): v is PlannedSchedule => Boolean(v));
+      .filter((v): v is PlannedSchedule => v !== null);
 
     const updatingOfferingIds = new Set(candidates.map((c) => c.offering_id).filter((v): v is number => Number.isInteger(v)));
 

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, Suspense, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, LogOut, Menu, Monitor, Moon, Search, Settings, Sun, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -326,7 +326,7 @@ function ProfileDropdown({
   );
 }
 
-export default function StudentShell({
+function StudentShellInner({
   initialSection = "home",
   customSectionContent,
 }: {
@@ -661,3 +661,24 @@ export default function StudentShell({
   );
 }
 
+
+function StudentShellFallback() {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent dark:border-blue-400" />
+          <p className="text-slate-600 dark:text-slate-300">Loading student portal...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function StudentShell(props: { initialSection?: Section; customSectionContent?: Partial<Record<Section, ReactNode>> } = {}) {
+  return (
+    <Suspense fallback={<StudentShellFallback />}>
+      <StudentShellInner {...props} />
+    </Suspense>
+  );
+}

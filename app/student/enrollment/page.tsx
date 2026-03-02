@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import toast from "react-hot-toast";
 import { FileDown, Wand2, X } from "lucide-react";
 
@@ -958,7 +958,7 @@ function StudentEnrollmentContent() {
   );
 }
 
-export default function StudentEnrollmentPage() {
+function StudentEnrollmentPageContent() {
   return (
     <StudentShell
       initialSection="student-enrollment"
@@ -966,5 +966,13 @@ export default function StudentEnrollmentPage() {
         "student-enrollment": <StudentEnrollmentContent />,
       }}
     />
+  );
+}
+
+export default function StudentEnrollmentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-16"><div className="max-w-7xl mx-auto px-4 py-8"><div className="max-w-2xl mx-auto"><EnrollmentPageSkeleton /></div></div></div>}>
+      <StudentEnrollmentPageContent />
+    </Suspense>
   );
 }
