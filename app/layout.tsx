@@ -16,6 +16,11 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "TClass - School Management System",
   description: "TClass School Learning Management System",
+  icons: {
+    icon: "/tclass_logo.png",
+    shortcut: "/tclass_logo.png",
+    apple: "/tclass_logo.png",
+  },
 };
 
 export default function RootLayout({

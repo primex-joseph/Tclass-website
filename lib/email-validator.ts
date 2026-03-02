@@ -26,13 +26,6 @@ export function isValidEmailFormat(email: string): boolean {
 }
 
 /**
- * Checks if email is a Gmail address
- */
-export function isGmail(email: string): boolean {
-  return email.toLowerCase().endsWith("@gmail.com");
-}
-
-/**
  * Checks if domain is a disposable email service
  */
 export function isDisposableEmail(email: string): boolean {
@@ -67,11 +60,6 @@ export function validateEmail(email: string): { valid: boolean; error?: string }
   // Check format
   if (!isValidEmailFormat(email)) {
     return { valid: false, error: "Invalid email format" };
-  }
-
-  // Check if Gmail (for this project requirement)
-  if (!isGmail(email)) {
-    return { valid: false, error: "Only Gmail addresses are accepted (@gmail.com)" };
   }
 
   // Check disposable

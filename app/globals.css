@@ -707,6 +707,37 @@
     color: oklch(0.75 0.02 246) !important;
   }
 
+  .dark .admission-page input:-webkit-autofill,
+  .dark .admission-page input:-webkit-autofill:hover,
+  .dark .admission-page input:-webkit-autofill:focus,
+  .dark .admission-page textarea:-webkit-autofill,
+  .dark .admission-page textarea:-webkit-autofill:hover,
+  .dark .admission-page textarea:-webkit-autofill:focus,
+  .dark .vocational-page input:-webkit-autofill,
+  .dark .vocational-page input:-webkit-autofill:hover,
+  .dark .vocational-page input:-webkit-autofill:focus,
+  .dark .vocational-page textarea:-webkit-autofill,
+  .dark .vocational-page textarea:-webkit-autofill:hover,
+  .dark .vocational-page textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: oklch(0.95 0.01 245) !important;
+    -webkit-box-shadow: 0 0 0 1000px oklch(0.14 0.02 258 / 0.92) inset !important;
+    box-shadow: 0 0 0 1000px oklch(0.14 0.02 258 / 0.92) inset !important;
+    caret-color: oklch(0.95 0.01 245) !important;
+    background-color: oklch(0.14 0.02 258 / 0.92) !important;
+    border-color: oklch(1 0 0 / 0.18) !important;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  .dark .admission-page input:autofill,
+  .dark .vocational-page input:autofill,
+  .dark .admission-page textarea:autofill,
+  .dark .vocational-page textarea:autofill {
+    -webkit-text-fill-color: oklch(0.95 0.01 245) !important;
+    box-shadow: 0 0 0 1000px oklch(0.14 0.02 258 / 0.92) inset !important;
+    background-color: oklch(0.14 0.02 258 / 0.92) !important;
+    color: oklch(0.95 0.01 245) !important;
+  }
+
   .dark .admission-page label,
   .dark .vocational-page label,
   .dark .admission-page h3,

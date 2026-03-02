@@ -17,6 +17,7 @@ type AdmissionSubmitInput = {
   rightThumbmarkFile?: File | null;
   birthCertificateFile?: File | null;
   validIdImageFile?: File | null;
+  validIdBackImageFile?: File | null;
 };
 
 export async function submitAdmissionForm(input: AdmissionSubmitInput) {
@@ -49,6 +50,7 @@ export async function submitAdmissionForm(input: AdmissionSubmitInput) {
   if (input.rightThumbmarkFile) body.append("right_thumbmark", input.rightThumbmarkFile);
   if (input.birthCertificateFile) body.append("birth_certificate", input.birthCertificateFile);
   if (input.validIdImageFile) body.append("valid_id_image", input.validIdImageFile);
+  if (input.validIdBackImageFile) body.append("valid_id_back_image", input.validIdBackImageFile);
 
   const response = await fetch(`${baseUrl}/admission/submit`, {
     method: "POST",

@@ -998,7 +998,7 @@ export default function LandingPage() {
                     <input
                       id="email"
                       type="email"
-                      placeholder="juan@gmail.com"
+                      placeholder="juan@example.com"
                       required
                       value={contactForm.email}
                       onChange={(event) => {
@@ -1007,8 +1007,7 @@ export default function LandingPage() {
                         setContactForm((previous) => ({ ...previous, email: value }));
                         if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: "" }));
                       }}
-                      pattern="[a-zA-Z0-9._%+-]+@gmail\.com$"
-                      title="Please enter a valid Gmail address (e.g., juan@gmail.com)"
+                      title="Please enter a valid email address (e.g., juan@example.com)"
                       className={cn(
                         "w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-slate-900 transition-colors focus:outline-none focus:ring-2 dark:bg-slate-900/80 dark:text-slate-100",
                         fieldErrors.email 

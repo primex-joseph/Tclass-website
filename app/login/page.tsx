@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AUTH_COOKIE_ROLE, AUTH_COOKIE_TOKEN, getRoleHome, normalizeRole, type UserRole } from "@/lib/auth";
 
 type LoginResponse = {
@@ -37,8 +44,59 @@ function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [switchingRole, setSwitchingRole] = useState<UserRole | null>(null);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!apiBaseUrl) {
+      toast.error("Missing NEXT_PUBLIC_API_BASE_URL in env.");
+      return;
+    }
+
+    if (!forgotEmail.trim()) {
+      toast.error("Please enter your email address.");
+      return;
+    }
+
+    setIsSendingReset(true);
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/auth/forgot-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(data.message || "Failed to send reset link. Please try again.");
+        return;
+      }
+
+      setResetSent(true);
+      toast.success(data.message || "Password reset link sent to your email.");
+    } catch {
+      toast.error("Cannot connect to backend API.");
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
+  const closeForgotModal = () => {
+    setForgotPasswordOpen(false);
+    setForgotEmail("");
+    setResetSent(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,9 +292,9 @@ function LoginPageContent() {
               >
                 {/* Loading overlay */}
                 {switchingRole === type.id && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-slate-900/20 backdrop-blur-[2px] z-10">
                     <div className="flex flex-col items-center gap-2">
-                      <div className="h-5 w-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                   </div>
                 )}
@@ -282,9 +340,13 @@ function LoginPageContent() {
                 <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Password
                 </Label>
-                <Link href="#" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium">
+                <button
+                  type="button"
+                  onClick={() => setForgotPasswordOpen(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+                >
                   Forgot password?
-                </Link>
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500" />
@@ -340,6 +402,86 @@ function LoginPageContent() {
       <div className="hidden lg:block absolute bottom-4 text-white/40 text-xs">
         © {new Date().getFullYear()} Provincial Government of Tarlac. All rights reserved.
       </div>
+
+      {/* Forgot Password Modal */}
+      <Dialog open={forgotPasswordOpen} onOpenChange={closeForgotModal}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">
+              {resetSent ? "Check Your Email" : "Reset Your Password"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {resetSent
+                ? "We've sent a password reset link to your email address. Please check your inbox and follow the instructions."
+                : "Enter your email address and we'll send you a link to reset your password."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {resetSent ? (
+            <div className="space-y-4 pt-4">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  ✓ Password reset link sent successfully!
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={closeForgotModal}
+                className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+              >
+                Back to Login
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email" className="text-slate-700 dark:text-slate-300">
+                  Email Address
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="pl-11 h-12 rounded-xl bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white dark:placeholder:text-slate-400"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeForgotModal}
+                  className="flex-1 h-11 rounded-xl border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSendingReset}
+                  className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                >
+                  {isSendingReset ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Sending...
+                    </span>
+                  ) : (
+                    "Send Reset Link"
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

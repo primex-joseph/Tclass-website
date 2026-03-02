@@ -397,6 +397,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
     departments: 0,
   });
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [recentCredentials, setRecentCredentials] = useState<{ fullName: string; email: string; studentNumber: string; temporaryPassword: string }[]>([]);
   const [activeAdminTab, setActiveAdminTab] = useState<AdminSectionTab>(initialAdminTab);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -422,6 +423,17 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
     attire_note: "Please wear proper attire. Avoid sleeveless tops, shorts, and slippers.",
     additional_note: "",
   });
+
+  // Auto-calculate day from date
+  useEffect(() => {
+    if (scheduleForm.exam_date) {
+      const date = new Date(scheduleForm.exam_date);
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = days[date.getDay()];
+      setScheduleForm((prev) => ({ ...prev, exam_day: dayName }));
+    }
+  }, [scheduleForm.exam_date]);
+
   const [courseTrendModalOpen, setCourseTrendModalOpen] = useState(false);
   const [selectedTrendCourse, setSelectedTrendCourse] = useState<CourseTrend | null>(null);
   const [selectedYearLevel, setSelectedYearLevel] = useState<"1st Year" | "2nd Year" | "3rd Year" | "4th Year" | null>(null);
@@ -582,15 +594,28 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
   useEffect(() => {
     let alive = true;
-    apiFetch("/admin/admissions")
-      .then((response) => {
+    setPageLoading(true);
+    Promise.all([
+      apiFetch("/admin/admissions"),
+      apiFetch("/admin/dashboard-stats"),
+    ])
+      .then(([admissionsResponse, statsResponse]) => {
         if (!alive) return;
-        const rows = (response as { applications?: AdmissionApplication[] }).applications ?? [];
+        const rows = (admissionsResponse as { applications?: AdmissionApplication[] }).applications ?? [];
         setAdmissions(rows);
+        const stats = (statsResponse as { stats?: DashboardStats }).stats;
+        if (stats) {
+          setDashboardStats(stats);
+        }
       })
       .catch((error) => {
         if (!alive) return;
-        toast.error(error instanceof Error ? error.message : "Failed to load admissions.");
+        toast.error(error instanceof Error ? error.message : "Failed to load data.");
+      })
+      .finally(() => {
+        if (alive) {
+          setPageLoading(false);
+        }
       });
 
     return () => {
@@ -1448,6 +1473,20 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
     .join("")
     .slice(0, 2)
     .toUpperCase() || "AD";
+
+  if (pageLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-200 dark:border-slate-700" />
+            <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin" />
+          </div>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-page flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -2994,47 +3033,50 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
       {/* Add Admin Dialog */}
       <Dialog open={addAdminOpen} onOpenChange={setAddAdminOpen}>
-        <DialogContent>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Add Admin Account</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Add Admin Account</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               Create another admin who can access the admin portal.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="new-admin-name">Full Name</Label>
+              <Label htmlFor="new-admin-name" className="text-slate-700 dark:text-slate-300">Full Name</Label>
               <Input
                 id="new-admin-name"
                 placeholder="e.g. Jane Doe"
                 value={newAdminForm.name}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, name: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new-admin-email">Email</Label>
+              <Label htmlFor="new-admin-email" className="text-slate-700 dark:text-slate-300">Email</Label>
               <Input
                 id="new-admin-email"
                 type="email"
                 placeholder="e.g. jane@tclass.local"
                 value={newAdminForm.email}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, email: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new-admin-password">Password (Optional)</Label>
+              <Label htmlFor="new-admin-password" className="text-slate-700 dark:text-slate-300">Password (Optional)</Label>
               <Input
                 id="new-admin-password"
                 type="password"
                 placeholder="Leave blank to auto-generate"
                 value={newAdminForm.password}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, password: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
-              <p className="text-xs text-slate-500">If blank, the system will generate a temporary password.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">If blank, the system will generate a temporary password.</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddAdminOpen(false)} disabled={creatingAdmin}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAddAdminOpen(false)} disabled={creatingAdmin} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">Cancel</Button>
             <Button onClick={handleCreateAdmin} disabled={creatingAdmin}>
               {creatingAdmin ? "Creating..." : "Create Admin"}
             </Button>
@@ -3044,68 +3086,70 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
       {/* Edit User Dialog */}
       <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-        <DialogContent>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Edit User</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               Update user information.
             </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Full Name</Label>
+                <Label htmlFor="edit-name" className="text-slate-700 dark:text-slate-300">Full Name</Label>
                 <Input 
                   id="edit-name" 
                   value={selectedUser.name}
                   onChange={(e) => setSelectedUser({...selectedUser, name: e.target.value})}
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
+                <Label htmlFor="edit-email" className="text-slate-700 dark:text-slate-300">Email</Label>
                 <Input 
                   id="edit-email" 
                   type="email"
                   value={selectedUser.email}
                   onChange={(e) => setSelectedUser({...selectedUser, email: e.target.value})}
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-role">Role</Label>
+                <Label htmlFor="edit-role" className="text-slate-700 dark:text-slate-300">Role</Label>
                 <Select 
                   value={selectedUser.role} 
                   onValueChange={(value: "Student" | "Faculty" | "Admin") => setSelectedUser({...selectedUser, role: value})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Student">Student</SelectItem>
-                    <SelectItem value="Faculty">Faculty</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+                    <SelectItem value="Student" className="text-slate-900 dark:text-slate-100">Student</SelectItem>
+                    <SelectItem value="Faculty" className="text-slate-900 dark:text-slate-100">Faculty</SelectItem>
+                    <SelectItem value="Admin" className="text-slate-900 dark:text-slate-100">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-status">Status</Label>
+                <Label htmlFor="edit-status" className="text-slate-700 dark:text-slate-300">Status</Label>
                 <Select 
                   value={selectedUser.status} 
                   onValueChange={(value: "active" | "pending" | "inactive") => setSelectedUser({...selectedUser, status: value})}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+                    <SelectItem value="active" className="text-slate-900 dark:text-slate-100">Active</SelectItem>
+                    <SelectItem value="pending" className="text-slate-900 dark:text-slate-100">Pending</SelectItem>
+                    <SelectItem value="inactive" className="text-slate-900 dark:text-slate-100">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditUserOpen(false)} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">Cancel</Button>
             <Button onClick={handleEditUser}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
@@ -3786,62 +3830,66 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[65vh] space-y-4 overflow-auto pr-1">
+          <div className="max-h-[65vh] space-y-4 overflow-auto pr-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="exam-subject">Email Subject</Label>
-                <Input id="exam-subject" value={scheduleForm.subject} onChange={(e) => setScheduleForm((p) => ({ ...p, subject: e.target.value }))} />
+                <Label htmlFor="exam-subject" className="text-slate-700 dark:text-slate-300">Email Subject</Label>
+                <Input id="exam-subject" value={scheduleForm.subject} onChange={(e) => setScheduleForm((p) => ({ ...p, subject: e.target.value }))} className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100" />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="exam-intro">Intro Message</Label>
+                <Label htmlFor="exam-intro" className="text-slate-700 dark:text-slate-300">Intro Message</Label>
                 <Textarea
                   id="exam-intro"
                   rows={3}
                   value={scheduleForm.intro_message}
                   onChange={(e) => setScheduleForm((p) => ({ ...p, intro_message: e.target.value }))}
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-date">Date</Label>
-                <Input id="exam-date" type="date" value={scheduleForm.exam_date} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_date: e.target.value }))} />
+                <Label htmlFor="exam-date" className="text-slate-700 dark:text-slate-300">Date</Label>
+                <Input id="exam-date" type="date" value={scheduleForm.exam_date} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_date: e.target.value }))} className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-time">Time</Label>
-                <Input id="exam-time" type="time" value={scheduleForm.exam_time} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_time: e.target.value }))} />
+                <Label htmlFor="exam-time" className="text-slate-700 dark:text-slate-300">Time</Label>
+                <Input id="exam-time" type="time" value={scheduleForm.exam_time} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_time: e.target.value }))} className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-day">Day</Label>
-                <Input id="exam-day" placeholder="e.g. Monday" value={scheduleForm.exam_day} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_day: e.target.value }))} />
+                <Label htmlFor="exam-day" className="text-slate-700 dark:text-slate-300">Day</Label>
+                <Input id="exam-day" placeholder="e.g. Monday" value={scheduleForm.exam_day} onChange={(e) => setScheduleForm((p) => ({ ...p, exam_day: e.target.value }))} className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400" />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="exam-location">Where</Label>
-                <Input id="exam-location" value={scheduleForm.location} onChange={(e) => setScheduleForm((p) => ({ ...p, location: e.target.value }))} />
+                <Label htmlFor="exam-location" className="text-slate-700 dark:text-slate-300">Where</Label>
+                <Input id="exam-location" value={scheduleForm.location} onChange={(e) => setScheduleForm((p) => ({ ...p, location: e.target.value }))} className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100" />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="exam-bring">Things to Bring</Label>
+                <Label htmlFor="exam-bring" className="text-slate-700 dark:text-slate-300">Things to Bring</Label>
                 <Textarea
                   id="exam-bring"
                   rows={4}
                   value={scheduleForm.things_to_bring}
                   onChange={(e) => setScheduleForm((p) => ({ ...p, things_to_bring: e.target.value }))}
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="exam-attire">Note (Proper Attire)</Label>
+                <Label htmlFor="exam-attire" className="text-slate-700 dark:text-slate-300">Note (Proper Attire)</Label>
                 <Textarea
                   id="exam-attire"
                   rows={2}
                   value={scheduleForm.attire_note}
                   onChange={(e) => setScheduleForm((p) => ({ ...p, attire_note: e.target.value }))}
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="exam-note">Additional Note (Optional)</Label>
+                <Label htmlFor="exam-note" className="text-slate-700 dark:text-slate-300">Additional Note (Optional)</Label>
                 <Textarea
                   id="exam-note"
                   rows={2}
                   value={scheduleForm.additional_note}
                   onChange={(e) => setScheduleForm((p) => ({ ...p, additional_note: e.target.value }))}
+                  className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
             </div>
