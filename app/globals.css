@@ -536,6 +536,19 @@
     color: oklch(0.72 0.02 246) !important;
   }
 
+  /* Admin page autofill styling for dark mode */
+  .dark .admin-page input:-webkit-autofill,
+  .dark .admin-page input:-webkit-autofill:hover,
+  .dark .admin-page input:-webkit-autofill:focus,
+  .dark .admin-page textarea:-webkit-autofill,
+  .dark .admin-page textarea:-webkit-autofill:hover,
+  .dark .admin-page textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: oklch(0.94 0.01 245) !important;
+    -webkit-box-shadow: 0 0 0px 1000px oklch(0.14 0.02 258 / 0.9) inset !important;
+    box-shadow: 0 0 0px 1000px oklch(0.14 0.02 258 / 0.9) inset !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+  }
+
   .dark .admin-page table th,
   .dark .admin-page table td {
     border-color: oklch(1 0 0 / 0.1);

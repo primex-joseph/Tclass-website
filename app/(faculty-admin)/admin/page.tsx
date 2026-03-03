@@ -169,6 +169,7 @@ interface AdmissionApplication {
     sent_by?: number;
     sent_at?: string;
   } | null;
+  form_data?: Record<string, unknown> | null;
 }
 
 export default function AdminDashboard() {
@@ -357,13 +358,22 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
   // Dialog states
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [addAdminOpen, setAddAdminOpen] = useState(false);
+  const [addFacultyOpen, setAddFacultyOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const [creatingFaculty, setCreatingFaculty] = useState(false);
   const [newAdminForm, setNewAdminForm] = useState({
     name: "",
     email: "",
     password: "",
+  });
+  const [newFacultyForm, setNewFacultyForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    department: "",
+    position: "",
   });
   
   // Data states
@@ -411,6 +421,8 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
   const [updatingExamStatusId, setUpdatingExamStatusId] = useState<number | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduleTarget, setScheduleTarget] = useState<AdmissionApplication | null>(null);
+  const [admissionDetailOpen, setAdmissionDetailOpen] = useState(false);
+  const [selectedAdmissionDetail, setSelectedAdmissionDetail] = useState<AdmissionApplication | null>(null);
   const [sendingSchedule, setSendingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     subject: "Entrance Exam Schedule Invitation - TCLASS",
@@ -818,6 +830,59 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
       toast.error(error instanceof Error ? error.message : "Failed to create admin account.");
     } finally {
       setCreatingAdmin(false);
+    }
+  };
+
+  const handleCreateFaculty = async () => {
+    const name = newFacultyForm.name.trim();
+    const email = newFacultyForm.email.trim().toLowerCase();
+    const password = newFacultyForm.password.trim();
+    const department = newFacultyForm.department.trim();
+    const position = newFacultyForm.position.trim();
+
+    if (!name || !email) {
+      toast.error("Full name and email are required.");
+      return;
+    }
+
+    if (password && password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+
+    setCreatingFaculty(true);
+    try {
+      const response = await apiFetch("/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          email,
+          role: "faculty",
+          password: password || undefined,
+          department: department || undefined,
+          position: position || undefined,
+        }),
+      }) as { message?: string; warning?: string | null; credentials_preview?: { temporary_password?: string | null } };
+
+      setAddFacultyOpen(false);
+      setNewFacultyForm({ name: "", email: "", password: "", department: "", position: "" });
+      setUserRoleFilter("faculty");
+      await loadUsers();
+
+      const generatedPassword = response.credentials_preview?.temporary_password ?? null;
+      toast.success(response.message ?? "Faculty account created successfully.");
+      if (response.warning) {
+        toast.error(response.warning);
+      } else {
+        toast.success("Credentials were sent to the faculty email.");
+      }
+      if (generatedPassword) {
+        toast(`Temporary password generated: ${generatedPassword}`, { duration: 7000 });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create faculty account.");
+    } finally {
+      setCreatingFaculty(false);
     }
   };
 
@@ -1374,6 +1439,11 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
     setScheduleModalOpen(true);
   };
 
+  const openAdmissionDetail = (application: AdmissionApplication) => {
+    setSelectedAdmissionDetail(application);
+    setAdmissionDetailOpen(true);
+  };
+
   const handleSendExamSchedule = async () => {
     if (!scheduleTarget) return;
     if (!scheduleForm.exam_date.trim() || !scheduleForm.exam_time.trim() || !scheduleForm.exam_day.trim()) {
@@ -1598,7 +1668,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
           </nav>
 
           <div className="border-t border-slate-200/80 px-4 py-3 dark:border-white/10">
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright Â· v1.0.0</p>
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright · v1.0.0</p>
           </div>
         </div>
       </aside>
@@ -2269,7 +2339,13 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          onClick={() => setAddFacultyOpen(true)}
+                        >
+                          Add Faculty
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
                           className="hidden md:inline-flex"
                           onClick={() => setViewAllAccountsOpen(true)}
                         >
@@ -2573,9 +2649,9 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                     ) : (
                       <div className="space-y-3">
                         {pendingAdmissions.map((item) => (
-                          <div key={item.id} className="border border-slate-200 rounded-lg p-3 sm:p-4 flex flex-col items-start gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="font-semibold text-slate-900">{item.full_name}</p>
+                          <div key={item.id} className="border border-slate-200 rounded-lg p-3 sm:p-4 flex flex-col items-start gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => openAdmissionDetail(item)}>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 dark:text-slate-100">{item.full_name}</p>
                               <p className="text-sm text-slate-600">
                                 {item.email} | Age {item.age} | {item.gender}
                               </p>
@@ -2592,7 +2668,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                                 Thumbmark {item.right_thumbmark_path ? "yes" : "no"}
                               </p>
                             </div>
-                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 size="sm"
                                 type="button"
@@ -3048,7 +3124,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 placeholder="e.g. Jane Doe"
                 value={newAdminForm.name}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, name: e.target.value }))}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
               />
             </div>
             <div className="space-y-2">
@@ -3059,7 +3135,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 placeholder="e.g. jane@tclass.local"
                 value={newAdminForm.email}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, email: e.target.value }))}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
               />
             </div>
             <div className="space-y-2">
@@ -3070,7 +3146,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 placeholder="Leave blank to auto-generate"
                 value={newAdminForm.password}
                 onChange={(e) => setNewAdminForm((prev) => ({ ...prev, password: e.target.value }))}
-                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">If blank, the system will generate a temporary password.</p>
             </div>
@@ -3079,6 +3155,81 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
             <Button variant="outline" onClick={() => setAddAdminOpen(false)} disabled={creatingAdmin} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">Cancel</Button>
             <Button onClick={handleCreateAdmin} disabled={creatingAdmin}>
               {creatingAdmin ? "Creating..." : "Create Admin"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Faculty Dialog */}
+      <Dialog open={addFacultyOpen} onOpenChange={setAddFacultyOpen}>
+        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Add Faculty Account</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Create a faculty account who can access faculty portal and manage classes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-faculty-name" className="text-slate-700 dark:text-slate-300">Full Name *</Label>
+              <Input
+                id="new-faculty-name"
+                placeholder="e.g. Dr. Jane Smith"
+                value={newFacultyForm.name}
+                onChange={(e) => setNewFacultyForm((prev) => ({ ...prev, name: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-faculty-email" className="text-slate-700 dark:text-slate-300">Email *</Label>
+              <Input
+                id="new-faculty-email"
+                type="email"
+                placeholder="e.g. jane.smith@tclass.local"
+                value={newFacultyForm.email}
+                onChange={(e) => setNewFacultyForm((prev) => ({ ...prev, email: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-faculty-department" className="text-slate-700 dark:text-slate-300">Department</Label>
+                <Input
+                  id="new-faculty-department"
+                  placeholder="e.g. IT Department"
+                  value={newFacultyForm.department}
+                  onChange={(e) => setNewFacultyForm((prev) => ({ ...prev, department: e.target.value }))}
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-faculty-position" className="text-slate-700 dark:text-slate-300">Position</Label>
+                <Input
+                  id="new-faculty-position"
+                  placeholder="e.g. Instructor"
+                  value={newFacultyForm.position}
+                  onChange={(e) => setNewFacultyForm((prev) => ({ ...prev, position: e.target.value }))}
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-faculty-password" className="text-slate-700 dark:text-slate-300">Password (Optional)</Label>
+              <Input
+                id="new-faculty-password"
+                type="password"
+                placeholder="Leave blank to auto-generate"
+                value={newFacultyForm.password}
+                onChange={(e) => setNewFacultyForm((prev) => ({ ...prev, password: e.target.value }))}
+                className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">If blank, the system will generate a temporary password.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddFacultyOpen(false)} disabled={creatingFaculty} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">Cancel</Button>
+            <Button onClick={handleCreateFaculty} disabled={creatingFaculty}>
+              {creatingFaculty ? "Creating..." : "Create Faculty"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3101,7 +3252,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                   id="edit-name" 
                   value={selectedUser.name}
                   onChange={(e) => setSelectedUser({...selectedUser, name: e.target.value})}
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
                 />
               </div>
               <div className="space-y-2">
@@ -3111,7 +3262,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                   type="email"
                   value={selectedUser.email}
                   onChange={(e) => setSelectedUser({...selectedUser, email: e.target.value})}
-                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
                 />
               </div>
               <div className="space-y-2">
@@ -3945,6 +4096,151 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 "Confirm Reject"
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admission Detail Modal */}
+      <Dialog open={admissionDetailOpen} onOpenChange={setAdmissionDetailOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-slate-900 dark:text-slate-100">Applicant Details</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              Full enrollment information for {selectedAdmissionDetail?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedAdmissionDetail && (
+            <div className="space-y-6 py-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Full Name</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.full_name}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Email</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.email}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Age</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.age}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Gender</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.gender}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Application Type</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.application_type || "admission"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Status</Label>
+                  <Badge className={selectedAdmissionDetail.status === "approved" ? "bg-green-100 text-green-700" : selectedAdmissionDetail.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>
+                    {selectedAdmissionDetail.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <hr className="border-slate-200 dark:border-slate-700" />
+
+              {/* Course Info */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Program Information</h4>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">Primary Course</Label>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.primary_course}</p>
+                  </div>
+                  {selectedAdmissionDetail.secondary_course && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">Secondary Course / Scholarship</Label>
+                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.secondary_course}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Exam Status */}
+              {(selectedAdmissionDetail.exam_attendance_status || selectedAdmissionDetail.exam_status) && (
+                <>
+                  <hr className="border-slate-200 dark:border-slate-700" />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Examination Status</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">Attendance</Label>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.exam_attendance_status?.replace("_", " ") || "-"}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">Result</Label>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.exam_status || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Form Data */}
+              {selectedAdmissionDetail.form_data && Object.keys(selectedAdmissionDetail.form_data).length > 0 && (
+                <>
+                  <hr className="border-slate-200 dark:border-slate-700" />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Additional Form Data</h4>
+                    <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
+                      {Object.entries(selectedAdmissionDetail.form_data).map(([key, value]) => (
+                        <div key={key} className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{key.replace(/_/g, " ")}</span>
+                          <span className="text-sm text-slate-900 dark:text-slate-100 text-right">
+                            {typeof value === "boolean" ? (value ? "Yes" : "No") : String(value || "-")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Attachments */}
+              <hr className="border-slate-200 dark:border-slate-700" />
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Attachments</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedAdmissionDetail.id_picture_path && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">ID Picture</Label>
+                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
+                    </div>
+                  )}
+                  {selectedAdmissionDetail.birth_certificate_path && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">Birth Certificate</Label>
+                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
+                    </div>
+                  )}
+                  {selectedAdmissionDetail.valid_id_path && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">Valid ID</Label>
+                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
+                    </div>
+                  )}
+                  {selectedAdmissionDetail.one_by_one_picture_path && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">1x1 Picture</Label>
+                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
+                    </div>
+                  )}
+                  {selectedAdmissionDetail.right_thumbmark_path && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 dark:text-slate-400">Right Thumbmark</Label>
+                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdmissionDetailOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
