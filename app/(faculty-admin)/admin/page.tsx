@@ -70,9 +70,10 @@ import {
   CornerUpLeft,
   CheckCheck,
   Trash,
-  FileText
+  FileText,
+  Printer
 } from "lucide-react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState, type UIEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -233,6 +234,141 @@ const TREND_COLOR_CLASSES = ["bg-blue-500", "bg-emerald-500", "bg-violet-500", "
 const YEAR_LABELS: Array<"1st Year" | "2nd Year" | "3rd Year" | "4th Year"> = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const BATCH_LABELS = ["Batch A", "Batch B", "Batch C", "Batch D"];
 const normalizeSearchValue = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
+const PRINT_LEARNER_CLASSIFICATIONS = [
+  "4Ps Beneficiary",
+  "Agrarian Reform Beneficiary",
+  "Balik Probinsya",
+  "Displaced Workers",
+  "Drug Dependents Surrenderees/Surrenderers",
+  "Family Members of AFP and PNP Killed-in-Action",
+  "Family Members of AFP and PNP Wounded-in-Action",
+  "Farmers and Fishermen",
+  "Indigenous People and Cultural Communities",
+  "Industry Workers",
+  "Inmates and Detainees",
+  "MILF Beneficiary",
+  "Out-of-School-Youth",
+  "Overseas Filipino Workers (OFW) Dependents",
+  "RCEF-RESP",
+  "Rebel Returnees/Decommissioned Combatants",
+  "Returning/Repatriated Overseas Filipino Workers (OFW)",
+  "Student",
+  "TESDA Alumni",
+  "TVET Trainers",
+  "Uniformed Personnel",
+  "Victim of Natural Disasters and Calamities",
+  "Wounded-in-Action AFP and PNP Personnel",
+];
+const PRINT_DISABILITY_TYPES = [
+  "Mental/Intellectual",
+  "Visual Disability",
+  "Orthopedic (Musculoskeletal) Disability",
+  "Hearing Disability",
+  "Speech Impairment",
+  "Multiple Disabilities (specify)",
+  "Psychosocial Disability",
+  "Disability Due to Chronic Illness",
+  "Learning Disability",
+];
+const PRINT_DISABILITY_CAUSES = ["Congenital/Inborn", "Illness", "Injury"];
+const PRINT_EDUCATIONAL_ATTAINMENTS = [
+  "No Grade Completed",
+  "Pre-School (Nursery/Kinder/Prep)",
+  "High School Undergraduate",
+  "High School Graduate",
+  "Elementary Undergraduate",
+  "Post Secondary Undergraduate",
+  "College Undergraduate",
+  "College Graduate or Higher",
+  "Elementary Graduate",
+  "Post Secondary Graduate",
+  "Junior High Graduate",
+  "Senior High Graduate",
+];
+const normalizeOption = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+const escapeHtml = (value: unknown) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+const sanitizeText = (value: unknown, fallback = " ") => {
+  const text = String(value ?? "").trim();
+  return text === "" ? fallback : text;
+};
+const parseArrayValue = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch {
+        // Fall through and treat value as plain text.
+      }
+    }
+    return [trimmed];
+  }
+  return [];
+};
+const findFieldValue = (source: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (key in source && source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== "") {
+      return source[key];
+    }
+  }
+  return undefined;
+};
+const splitFullName = (fullName: string) => {
+  const chunks = fullName
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (chunks.length === 0) return { firstName: "", middleName: "", lastName: "", extensionName: "" };
+  if (chunks.length === 1) return { firstName: chunks[0], middleName: "", lastName: "", extensionName: "" };
+  const lastName = chunks[chunks.length - 1] ?? "";
+  const firstName = chunks[0] ?? "";
+  const middleName = chunks.slice(1, -1).join(" ");
+  return { firstName, middleName, lastName, extensionName: "" };
+};
+const formatEnumLabel = (value?: string | null) =>
+  (value ?? "")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "-";
+const formatFormKey = (key: string) =>
+  key
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+const formatFormValue = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.length ? value.map((item) => String(item)).join(", ") : "-";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+const admissionStatusBadgeClass = (status: AdmissionApplication["status"]) => {
+  if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
+  if (status === "rejected") return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300";
+  return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300";
+};
+const examStatusBadgeClass = (status: "passed" | "failed" | "not_attended" | "attended" | "unset") => {
+  if (status === "passed" || status === "attended") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300";
+  }
+  if (status === "failed" || status === "not_attended") {
+    return "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300";
+  }
+  return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300";
+};
 
 const formatJoinedTime = (dateText?: string) => {
   if (!dateText) return "just now";
@@ -423,6 +559,10 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
   const [scheduleTarget, setScheduleTarget] = useState<AdmissionApplication | null>(null);
   const [admissionDetailOpen, setAdmissionDetailOpen] = useState(false);
   const [selectedAdmissionDetail, setSelectedAdmissionDetail] = useState<AdmissionApplication | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfPreviewHtml, setPdfPreviewHtml] = useState("");
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const pdfPreviewFrameRef = useRef<HTMLIFrameElement | null>(null);
   const [sendingSchedule, setSendingSchedule] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     subject: "Entrance Exam Schedule Invitation - TCLASS",
@@ -1024,6 +1164,524 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
     setSelectedUser(user);
     setDeleteConfirmOpen(true);
   };
+  const handleAdmissionPrint = useCallback(() => {
+    if (!selectedAdmissionDetail) {
+      toast.error("No applicant selected.");
+      return;
+    }
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const formData =
+      selectedAdmissionDetail.form_data && typeof selectedAdmissionDetail.form_data === "object"
+        ? (selectedAdmissionDetail.form_data as Record<string, unknown>)
+        : {};
+    const fullNameParts = splitFullName(selectedAdmissionDetail.full_name ?? "");
+    const getValue = (keys: string[], fallback = "") => {
+      const value = findFieldValue(formData, keys);
+      return sanitizeText(value ?? fallback, "");
+    };
+    const getArray = (keys: string[]) => parseArrayValue(findFieldValue(formData, keys));
+    const isChecked = (selected: string[], option: string) => {
+      const target = normalizeOption(option);
+      return selected.some((value) => normalizeOption(value) === target);
+    };
+    const checkbox = (checked: boolean, label: string) =>
+      `<div class="check-item"><span class="cb">${checked ? "☑" : "☐"}</span><span>${escapeHtml(label)}</span></div>`;
+
+    const uliNumber = getValue(["uliNumber", "uli_number"]);
+    const entryDate = getValue(["entryDate", "entry_date"]);
+    const lastName = getValue(["lastName", "last_name"], fullNameParts.lastName);
+    const firstName = getValue(["firstName", "first_name"], fullNameParts.firstName);
+    const middleName = getValue(["middleName", "middle_name"], fullNameParts.middleName);
+    const extensionName = getValue(["extensionName", "extension_name"], fullNameParts.extensionName);
+    const numberStreet = getValue(["numberStreet", "number_street"]);
+    const barangay = getValue(["barangay"]);
+    const district = getValue(["district"]);
+    const cityMunicipality = getValue(["cityMunicipality", "city_municipality"]);
+    const province = getValue(["province"]);
+    const region = getValue(["region"]);
+    const emailAddress = getValue(["emailAddress", "email_address"], selectedAdmissionDetail.email ?? "");
+    const facebookAccount = getValue(["facebookAccount", "facebook_account"]);
+    const contactNo = getValue(["contactNo", "contact_no"], "");
+    const nationality = getValue(["nationality"]);
+    const sex = getValue(["sex"], selectedAdmissionDetail.gender ?? "");
+    const civilStatus = getArray(["civilStatus", "civil_status"]);
+    const employmentStatus = getValue(["employmentStatus", "employment_status"]);
+    const monthOfBirth = getValue(["monthOfBirth", "month_of_birth"]);
+    const dayOfBirth = getValue(["dayOfBirth", "day_of_birth"]);
+    const yearOfBirth = getValue(["yearOfBirth", "year_of_birth"]);
+    const age = getValue(["age"], String(selectedAdmissionDetail.age ?? ""));
+    const birthplaceCity = getValue(["birthplaceCity", "birthplace_city"]);
+    const birthplaceProvince = getValue(["birthplaceProvince", "birthplace_province"]);
+    const birthplaceRegion = getValue(["birthplaceRegion", "birthplace_region"]);
+    const educationalAttainment = getArray(["educationalAttainment", "educational_attainment"]);
+    const parentGuardianName = getValue(["parentGuardianName", "parent_guardian_name"]);
+    const parentGuardianAddress = getValue(["parentGuardianAddress", "parent_guardian_address"]);
+    const parentGuardianBirthdate = getValue(["parentGuardianBirthdate", "parent_guardian_birthdate"]);
+    const parentGuardianRelationship = getValue(["parentGuardianRelationship", "parent_guardian_relationship"]);
+    const learnerClassifications = getArray(["learnerClassifications", "learner_classifications"]);
+    const learnerClassificationOthers = getValue(["learnerClassificationOthers", "learner_classification_others"]);
+    const disabilityTypes = getArray(["disabilityTypes", "disability_types"]);
+    const disabilityTypeOthers = getValue(["disabilityTypeOthers", "disability_type_others"]);
+    const disabilityCauses = getArray(["disabilityCauses", "disability_causes"]);
+    const courseQualificationName = getValue(["courseQualificationName", "course_qualification_name"], selectedAdmissionDetail.primary_course ?? "");
+    const scholarshipType = getValue(["scholarshipType", "scholarship_type"], selectedAdmissionDetail.secondary_course ?? "");
+    const privacyConsent = getValue(["privacyConsent", "privacy_consent"]);
+    const applicantSignature = getValue(["applicantSignature", "applicant_signature"], selectedAdmissionDetail.full_name ?? "");
+    const dateAccomplished = getValue(["dateAccomplished", "date_accomplished"]);
+    const notedByName = getValue(["notedByName", "noted_by_name"]);
+    const dateReceived = getValue(["dateReceived", "date_received"]);
+
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+    const backendOrigin = apiBase.replace(/\/api\/?$/, "");
+    const fileUrl = (path?: string | null) => {
+      if (!path) return "";
+      if (/^https?:\/\//i.test(path)) return path;
+      if (!backendOrigin) return "";
+      const normalized = path.startsWith("/") ? path : `/storage/${path}`;
+      return `${backendOrigin}${normalized}`;
+    };
+    const proxiedImageUrl = (source?: string) =>
+      source ? `/api/proxy-image?url=${encodeURIComponent(source)}` : "";
+    const systemLogoUrl = "/tclass_logo.png";
+
+    const idPictureUrl = proxiedImageUrl(fileUrl(selectedAdmissionDetail.id_picture_path));
+    const oneByOneUrl = proxiedImageUrl(fileUrl(selectedAdmissionDetail.one_by_one_picture_path));
+    const thumbmarkUrl = proxiedImageUrl(fileUrl(selectedAdmissionDetail.right_thumbmark_path));
+
+    const learnerClassificationMarkup = PRINT_LEARNER_CLASSIFICATIONS.map((option) =>
+      checkbox(isChecked(learnerClassifications, option), option)
+    ).join("");
+    const disabilityTypeMarkup = PRINT_DISABILITY_TYPES.map((option) =>
+      checkbox(isChecked(disabilityTypes, option), option)
+    ).join("");
+    const disabilityCauseMarkup = PRINT_DISABILITY_CAUSES.map((option) =>
+      checkbox(isChecked(disabilityCauses, option), option)
+    ).join("");
+    const educationalAttainmentMarkup = PRINT_EDUCATIONAL_ATTAINMENTS.map((option) =>
+      checkbox(isChecked(educationalAttainment, option), option)
+    ).join("");
+    const uliClean = uliNumber.replace(/[^A-Za-z0-9-]/g, "").slice(0, 16);
+    const uliBoxesMarkup = Array.from({ length: 16 }, (_, index) => {
+      const char = uliClean[index] ?? "";
+      return `<span>${escapeHtml(char)}</span>`;
+    }).join("");
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>TESDA Registration Form Preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; background: #e5e7eb; }
+      .wrapper { padding: 14px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+      .page { width: 210mm; min-height: 297mm; background: #fff; border: 1px solid #111; padding: 8mm; font-size: 11px; line-height: 1.25; font-family: "Times New Roman", Times, serif; }
+      .row { display: grid; gap: 6px; }
+      .field { border: 1px solid #111; min-height: 18px; padding: 2px 5px; }
+      .label { font-weight: 700; }
+      .small { font-size: 10px; }
+      .tiny { font-size: 9px; }
+      .center { text-align: center; }
+      .right { text-align: right; }
+      .mb6 { margin-bottom: 6px; }
+      .mb8 { margin-bottom: 8px; }
+      .mb10 { margin-bottom: 10px; }
+      .section-title { border: 1px solid #111; padding: 3px 6px; font-size: 14px; font-weight: 700; min-height: 24px; margin-bottom: 2px; }
+      .line-grid { display: grid; border-left: 1px solid #111; border-top: 1px solid #111; }
+      .line-grid > div { border-right: 1px solid #111; border-bottom: 1px solid #111; padding: 3px 5px; min-height: 22px; }
+      .check-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 1px solid #111; border-top: 1px solid #111; }
+      .check-item { border-right: 1px solid #111; border-bottom: 1px solid #111; padding: 4px 6px; display: flex; align-items: flex-start; gap: 6px; min-height: 24px; }
+      .cb { font-size: 13px; line-height: 1; margin-top: 1px; }
+      .head-grid { display: grid; grid-template-columns: 80px 1fr 124px; border: 1px solid #111; }
+      .head-grid > div { border-right: 1px solid #111; padding: 4px 8px; min-height: 54px; display: flex; align-items: center; justify-content: center; }
+      .head-grid > div:last-child { border-right: 0; }
+      .head-grid > div:first-child { padding: 0; }
+      .logo-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+      }
+      .logo-core {
+        width: 100%;
+        height: 100%;
+        max-width: 54px;
+        max-height: 54px;
+        aspect-ratio: 1 / 1;
+        border-radius: 50%;
+        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+      }
+      .logo-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center;
+        image-rendering: -webkit-optimize-contrast;
+        filter: contrast(1.06) saturate(1.06);
+      }
+      .head-copy { text-align: center; line-height: 1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .head-main { font-size: 12px; font-weight: 700; letter-spacing: 0.1px; white-space: nowrap; }
+      .head-sub { margin-top: 2px; font-size: 9.8px; white-space: nowrap; }
+      .head-code { text-align: center; line-height: 1.12; font-weight: 700; font-size: 11px; }
+      .head-code small { display: block; margin-top: 1px; font-size: 9px; font-weight: 500; }
+      .form-main-title {
+        font-family: "Arial Black", Arial, Helvetica, sans-serif;
+        font-weight: 800;
+        text-align: center;
+        letter-spacing: 0.4px;
+      }
+      .photo-box { border: 1px solid #111; height: 98px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+      .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+      .signature-line { border-top: 1px solid #111; padding-top: 4px; font-weight: 700; text-align: center; }
+      .signature-wrap { display: grid; grid-template-columns: 1fr 190px; border: 1px solid #111; border-top: 0; min-height: 220px; }
+      .signature-left { border-right: 1px solid #111; padding: 6px 8px; display: flex; flex-direction: column; }
+      .sig-note { text-align: center; font-size: 10px; margin-bottom: 10px; }
+      .sig-row { display: grid; grid-template-columns: 1fr 180px; gap: 10px; align-items: end; }
+      .sig-row + .sig-row { margin-top: 10px; }
+      .sig-cell { min-height: 56px; display: flex; flex-direction: column; justify-content: flex-end; }
+      .sig-value { border-bottom: 1px solid #111; min-height: 24px; display: flex; align-items: flex-end; padding: 0 4px 2px; }
+      .sig-label { text-align: center; font-size: 10px; font-weight: 700; margin-top: 3px; }
+      .sig-noted { margin-top: 8px; margin-bottom: 6px; font-size: 10px; }
+      .signature-right { padding: 4px; display: flex; flex-direction: column; gap: 6px; }
+      .signature-right .photo-box { height: 114px; }
+      .thumb-box { height: 92px !important; }
+      .thumb-caption { text-align: center; font-size: 11px; font-weight: 700; }
+      .page-two { font-size: 10.5px; line-height: 1.28; }
+      .page-two .section-title { font-size: 13px; margin-bottom: 6px; padding: 3px 6px 6px; }
+      .page-two .check-item { min-height: 30px; align-items: flex-start; padding: 4px 6px; }
+      .page-two .check-item span:last-child { display: block; line-height: 1.24; }
+      .page-two .line-grid > div { min-height: 26px; padding: 4px 6px; }
+      .page-two .sig-note { margin-bottom: 14px; }
+      .page-two .sig-row + .sig-row { margin-top: 14px; }
+      .page-one { padding: 6mm; font-size: 11.5px; line-height: 1.22; }
+      .page-one .section-title { font-size: 14px; padding: 3px 7px 6px; margin-bottom: 6px; }
+      .page-one .line-grid > div { min-height: 26px; padding: 3px 6px; }
+      .page-one .check-item { min-height: 24px; padding: 3px 6px; }
+      .uli-wrap .label { margin-bottom: 6px; display: block; line-height: 1.2; }
+      .uli-boxes { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); border-left: 1px solid #111; border-top: 1px solid #111; }
+      .uli-boxes span { border-right: 1px solid #111; border-bottom: 1px solid #111; text-align: center; min-height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+      .mailing-grid .mailing-tag { grid-row: 1 / span 3; display: flex; align-items: flex-start; padding-top: 6px; }
+      .title-registration { font-size: 40px; margin: 10px 0 18px; min-height: 68px; padding-bottom: 8px; display: flex; align-items: center; justify-content: center; line-height: 1.03; }
+      .title-learner { font-size: 24px; letter-spacing: 3px; min-height: 96px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+      .page-one .head-grid > div { min-height: 66px; }
+      .page-one .logo-box { width: 100%; height: 100%; }
+      .page-one .logo-core { width: 100px; height: 54px; max-width: 100px; max-height: 54px; }
+      .page-one .photo-box { min-height: 118px; }
+      .page-one .tiny { font-size: 10px; }
+      .page-one .small { font-size: 11px; }
+      .page-one .mb6 { margin-bottom: 9px; }
+      .page-one .section-one-title { margin-bottom: 10px; padding-top: 4px; padding-bottom: 8px; }
+      .page-one .section-two-title { margin-bottom: 8px; }
+      .page-one .mb8 { margin-bottom: 12px; }
+      .page-one .mb10 { margin-bottom: 14px; }
+      .page-one .personal-main > div { min-height: 124px; }
+      .page-one .education-grid .check-item { min-height: 30px; }
+      .page-one .parent-grid > div { min-height: 34px; }
+      .page-break { page-break-after: always; }
+      @media print {
+        body { background: #fff; }
+        .wrapper { padding: 0; gap: 0; }
+        .page { border: 0; width: 100%; min-height: auto; margin: 0; padding: 8mm; }
+        .page-break { break-after: page; page-break-after: always; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <section class="page page-one page-break">
+        <div class="head-grid mb8">
+          <div><div class="logo-box"><span class="logo-core"><img src="${escapeHtml(systemLogoUrl)}" alt="TCLASS Logo" /></span></div></div>
+          <div class="head-copy">
+            <div class="head-main">Technical Education and Skills Development Authority</div>
+            <div class="head-sub">Pangasiwaan sa Edukasyong Teknikal at Pagpapaunlad ng Kasanayan</div>
+          </div>
+          <div class="head-code"><div>MIS 03 - 01</div><small>(ver. 2020)</small></div>
+        </div>
+        <div class="title-registration form-main-title">Registration Form</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr 190px;">
+          <div class="title-learner">LEARNERS PROFILE FORM</div>
+          <div>
+            <div class="photo-box" style="height: 100px;">${idPictureUrl ? `<img src="${escapeHtml(idPictureUrl)}" alt="I.D. Picture" />` : "I.D. Picture"}</div>
+          </div>
+        </div>
+
+        <div class="section-title section-one-title">1. T2MIS Auto Generated</div>
+        <div class="line-grid mb6" style="grid-template-columns: 1fr 210px;">
+          <div class="uli-wrap">
+            <span class="label">1.1 Unique Learner Identifier (ULI) Number:</span>
+            <div class="uli-boxes">${uliBoxesMarkup}</div>
+          </div>
+          <div><span class="label">1.2 Entry Date:</span> ${escapeHtml(entryDate || "-")}</div>
+        </div>
+
+        <div class="section-title section-two-title">2. Learner/Manpower Profile</div>
+        <div class="line-grid" style="grid-template-columns: 1.3fr 0.9fr 0.8fr;">
+          <div><span class="label">2.1 Name (Last, Extension):</span> ${escapeHtml([lastName, extensionName].filter(Boolean).join(" ") || "-")}</div>
+          <div><span class="label">First:</span> ${escapeHtml(firstName || "-")}</div>
+          <div><span class="label">Middle:</span> ${escapeHtml(middleName || "-")}</div>
+        </div>
+        <div class="line-grid mailing-grid" style="grid-template-columns: 175px 1fr 1fr 1fr;">
+          <div class="mailing-tag"><span class="label">2.2 Complete Permanent Mailing Address:</span></div>
+          <div><span class="label">2.2 Number/Street:</span> ${escapeHtml(numberStreet || "-")}</div>
+          <div><span class="label">Barangay:</span> ${escapeHtml(barangay || "-")}</div>
+          <div><span class="label">District:</span> ${escapeHtml(district || "-")}</div>
+          <div><span class="label">City/Municipality:</span> ${escapeHtml(cityMunicipality || "-")}</div>
+          <div><span class="label">Province:</span> ${escapeHtml(province || "-")}</div>
+          <div><span class="label">Region:</span> ${escapeHtml(region || "-")}</div>
+        </div>
+        <div class="line-grid mb6" style="grid-template-columns: 175px 1fr 1fr 1fr;">
+          <div></div>
+          <div><span class="label">Email/Facebook:</span> ${escapeHtml([emailAddress, facebookAccount].filter(Boolean).join(" / ") || "-")}</div>
+          <div><span class="label">Contact No:</span> ${escapeHtml(contactNo || "-")}</div>
+          <div><span class="label">Nationality:</span> ${escapeHtml(nationality || "-")}</div>
+        </div>
+
+        <div class="section-title">3. Personal Information</div>
+        <div class="line-grid personal-main mb6" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div>
+            <div class="label mb6">3.1 Sex</div>
+            ${checkbox(normalizeOption(sex) === normalizeOption("Male"), "Male")}
+            ${checkbox(normalizeOption(sex) === normalizeOption("Female"), "Female")}
+          </div>
+          <div>
+            <div class="label mb6">3.2 Civil Status</div>
+            ${["Single", "Married", "Widow/er", "Separated", "Solo Parent"].map((item) => checkbox(isChecked(civilStatus, item), item)).join("")}
+          </div>
+          <div>
+            <div class="label mb6">3.3 Employment Status (before the training)</div>
+            ${checkbox(normalizeOption(employmentStatus) === normalizeOption("Employed"), "Employed")}
+            ${checkbox(normalizeOption(employmentStatus) === normalizeOption("Unemployed"), "Unemployed")}
+          </div>
+        </div>
+        <div class="line-grid mb6" style="grid-template-columns: 1fr 1fr 1fr 105px;">
+          <div><span class="label">3.4 Month of Birth:</span> ${escapeHtml(monthOfBirth || "-")}</div>
+          <div><span class="label">Day of Birth:</span> ${escapeHtml(dayOfBirth || "-")}</div>
+          <div><span class="label">Year of Birth:</span> ${escapeHtml(yearOfBirth || "-")}</div>
+          <div><span class="label">Age:</span> ${escapeHtml(age || "-")}</div>
+        </div>
+        <div class="line-grid mb6" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div><span class="label">3.5 Birthplace City/Municipality:</span> ${escapeHtml(birthplaceCity || "-")}</div>
+          <div><span class="label">Province:</span> ${escapeHtml(birthplaceProvince || "-")}</div>
+          <div><span class="label">Region:</span> ${escapeHtml(birthplaceRegion || "-")}</div>
+        </div>
+
+        <div class="section-title">3.6 Educational Attainment Before the Training (Trainee)</div>
+        <div class="check-grid education-grid mb6">${educationalAttainmentMarkup}</div>
+
+        <div class="section-title">3.7 Parent/Guardian</div>
+        <div class="line-grid parent-grid" style="grid-template-columns: 1fr 1fr;">
+          <div><span class="label">Name:</span> ${escapeHtml(parentGuardianName || "-")}</div>
+          <div><span class="label">Complete Permanent Mailing Address:</span> ${escapeHtml(parentGuardianAddress || "-")}</div>
+          <div><span class="label">Birthdate:</span> ${escapeHtml(parentGuardianBirthdate || "-")}</div>
+          <div><span class="label">Relationship:</span> ${escapeHtml(parentGuardianRelationship || "-")}</div>
+        </div>
+      </section>
+
+      <section class="page page-two">
+        <div class="section-title">4. Learner/Trainee/Student (Clients) Classification</div>
+        <div class="check-grid mb8">${learnerClassificationMarkup}</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr;">
+          <div><span class="label">Others (Please Specify):</span> ${escapeHtml(learnerClassificationOthers || "-")}</div>
+        </div>
+
+        <div class="section-title">5. Type of Disability (for Persons with Disability Only)</div>
+        <div class="check-grid mb8">${disabilityTypeMarkup}</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr;">
+          <div><span class="label">Multiple Disabilities/Others Specify:</span> ${escapeHtml(disabilityTypeOthers || "-")}</div>
+        </div>
+
+        <div class="section-title">6. Causes of Disability (for Persons with Disability Only)</div>
+        <div class="check-grid mb8">${disabilityCauseMarkup}</div>
+
+        <div class="section-title">7. Name of Course/Qualification</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr;">
+          <div>${escapeHtml(courseQualificationName || "-")}</div>
+        </div>
+
+        <div class="section-title">8. If Scholar, What Type of Scholarship Package (TWSP, PESFA, STEP, others)?</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr;">
+          <div>${escapeHtml(scholarshipType || "-")}</div>
+        </div>
+
+        <div class="section-title">9. Privacy Disclaimer</div>
+        <div class="line-grid mb8" style="grid-template-columns: 1fr;">
+          <div>
+            I hereby allow TESDA to use/post my contact details, name, email, cellphone/landline nos. and other information I provided
+            which may be used for processing of my scholarship application, for employment opportunities and for the survey of TESDA programs.
+            <div style="display: flex; gap: 24px; margin-top: 8px;">
+              ${checkbox(normalizeOption(privacyConsent) === normalizeOption("agree"), "Agree")}
+              ${checkbox(normalizeOption(privacyConsent) === normalizeOption("disagree"), "Disagree")}
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">10. Applicant's Signature</div>
+        <div class="signature-wrap mb8">
+          <div class="signature-left">
+            <div class="sig-note">This is to certify that the information stated above is true and correct.</div>
+            <div class="sig-row">
+              <div class="sig-cell">
+                <div class="sig-value" style="justify-content:center; text-align:center;">${escapeHtml(applicantSignature || " ")}</div>
+                <div class="sig-label">APPLICANT'S SIGNATURE OVER PRINTED NAME</div>
+              </div>
+              <div class="sig-cell">
+                <div class="sig-value" style="justify-content:center;">${escapeHtml(dateAccomplished || " ")}</div>
+                <div class="sig-label">DATE ACCOMPLISHED</div>
+              </div>
+            </div>
+            <div class="sig-noted">Noted by:</div>
+            <div class="sig-row">
+              <div class="sig-cell">
+                <div class="sig-value">${escapeHtml(notedByName || " ")}</div>
+                <div class="sig-label">REGISTRAR/SCHOOL ADMINISTRATOR</div>
+              </div>
+              <div class="sig-cell">
+                <div class="sig-value" style="justify-content:center;">${escapeHtml(dateReceived || " ")}</div>
+                <div class="sig-label">DATE RECEIVED</div>
+              </div>
+            </div>
+          </div>
+          <div class="signature-right">
+            <div class="photo-box">
+              ${oneByOneUrl ? `<img src="${escapeHtml(oneByOneUrl)}" alt="1x1 Picture" />` : `<div class="center small">1x1 picture taken<br />within the last 6 months</div>`}
+            </div>
+            <div class="photo-box thumb-box">
+              ${thumbmarkUrl ? `<img src="${escapeHtml(thumbmarkUrl)}" alt="Right Thumbmark" />` : ""}
+            </div>
+            <div class="thumb-caption">Right Thumbmark</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>`;
+    setPdfPreviewHtml(html);
+    setPdfPreviewOpen(true);
+  }, [selectedAdmissionDetail]);
+  const handleGeneratePdf = useCallback(async () => {
+    const iframe = pdfPreviewFrameRef.current;
+    const doc = iframe?.contentDocument;
+    if (!doc) {
+      toast.error("PDF view is not ready yet.");
+      return;
+    }
+
+    setGeneratingPdf(true);
+    try {
+      const [{ default: html2canvas }, { PDFDocument }] = await Promise.all([import("html2canvas"), import("pdf-lib")]);
+      const pageNodes = Array.from(doc.querySelectorAll(".page")) as HTMLElement[];
+      const targets = pageNodes.length > 0 ? pageNodes : ([doc.body] as HTMLElement[]);
+      const pdf = await PDFDocument.create();
+      const pointsPerMm = 72 / 25.4;
+      const a4Width = 210 * pointsPerMm;
+      const a4Height = 297 * pointsPerMm;
+
+      for (let i = 0; i < targets.length; i += 1) {
+        const page = targets[i];
+        const pageClone = page.cloneNode(true) as HTMLElement;
+        pageClone.style.position = "fixed";
+        pageClone.style.left = "-10000px";
+        pageClone.style.top = "0";
+        pageClone.style.zIndex = "-1";
+        pageClone.style.pointerEvents = "none";
+
+        const blobToDataUrl = (blob: Blob) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result ?? ""));
+            reader.onerror = () => reject(new Error("Failed to convert image blob to data URL."));
+            reader.readAsDataURL(blob);
+          });
+
+        // Resolve all images ahead of html2canvas so broken links do not throw capture-time load errors.
+        const cloneImages = Array.from(pageClone.querySelectorAll("img")) as HTMLImageElement[];
+        for (const img of cloneImages) {
+          const src = img.getAttribute("src") ?? "";
+          if (!src) continue;
+          if (src.startsWith("data:") || src.startsWith("blob:")) continue;
+
+          try {
+            const response = await fetch(src, { cache: "no-store" });
+            if (!response.ok) throw new Error(`Image fetch failed (${response.status}).`);
+            const blob = await response.blob();
+            img.src = await blobToDataUrl(blob);
+          } catch {
+            const placeholder = pageClone.ownerDocument.createElement("div");
+            placeholder.textContent = img.getAttribute("alt") || "Image";
+            placeholder.style.display = "flex";
+            placeholder.style.alignItems = "center";
+            placeholder.style.justifyContent = "center";
+            placeholder.style.textAlign = "center";
+            placeholder.style.fontSize = "10px";
+            placeholder.style.border = "1px solid #111";
+            placeholder.style.width = `${img.width || 120}px`;
+            placeholder.style.height = `${img.height || 90}px`;
+            img.replaceWith(placeholder);
+          }
+        }
+
+        doc.body.appendChild(pageClone);
+        const canvas = await html2canvas(pageClone, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#ffffff",
+          windowWidth: pageClone.scrollWidth,
+          windowHeight: pageClone.scrollHeight,
+        });
+        pageClone.remove();
+
+        const imgData = canvas.toDataURL("image/png");
+        const bytes = Uint8Array.from(atob(imgData.split(",")[1] ?? ""), (char) => char.charCodeAt(0));
+        const png = await pdf.embedPng(bytes);
+        const pdfPage = pdf.addPage([a4Width, a4Height]);
+        const pngRatio = png.width / png.height;
+        const pageRatio = a4Width / a4Height;
+        let drawWidth = a4Width;
+        let drawHeight = a4Height;
+
+        if (pngRatio > pageRatio) {
+          drawHeight = a4Width / pngRatio;
+        } else {
+          drawWidth = a4Height * pngRatio;
+        }
+
+        const offsetX = (a4Width - drawWidth) / 2;
+        const offsetY = (a4Height - drawHeight) / 2;
+        pdfPage.drawImage(png, { x: offsetX, y: offsetY, width: drawWidth, height: drawHeight });
+      }
+
+      const fileNameBase = (selectedAdmissionDetail?.full_name ?? "registration-form")
+        .trim()
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase();
+      const pdfBytes = await pdf.save();
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${fileNameBase || "registration-form"}_tesda_form.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF generated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to generate PDF.");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }, [selectedAdmissionDetail]);
 
   const pendingAdmissions = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "admission");
   const pendingVocationals = admissions.filter((item) => item.status === "pending" && (item.application_type ?? "admission") === "vocational");
@@ -4102,146 +4760,187 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
       {/* Admission Detail Modal */}
       <Dialog open={admissionDetailOpen} onOpenChange={setAdmissionDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-slate-100">Applicant Details</DialogTitle>
-            <DialogDescription className="text-slate-600 dark:text-slate-400">
-              Full enrollment information for {selectedAdmissionDetail?.full_name}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedAdmissionDetail && (
-            <div className="space-y-6 py-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Full Name</Label>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.full_name}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Email</Label>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.email}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Age</Label>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.age}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Gender</Label>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.gender}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Application Type</Label>
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.application_type || "admission"}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">Status</Label>
-                  <Badge className={selectedAdmissionDetail.status === "approved" ? "bg-green-100 text-green-700" : selectedAdmissionDetail.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>
-                    {selectedAdmissionDetail.status}
-                  </Badge>
-                </div>
+        <DialogContent className="w-[calc(100vw-1.25rem)] max-w-4xl gap-0 overflow-hidden border border-blue-200/70 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 px-6 py-5 text-left dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Student Information</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-300">
+                  Complete enrollment profile for <span className="font-medium text-slate-800 dark:text-slate-200">{selectedAdmissionDetail?.full_name}</span>
+                </DialogDescription>
               </div>
-
-              <hr className="border-slate-200 dark:border-slate-700" />
-
-              {/* Course Info */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Program Information</h4>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 dark:text-slate-400">Primary Course</Label>
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.primary_course}</p>
-                  </div>
-                  {selectedAdmissionDetail.secondary_course && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">Secondary Course / Scholarship</Label>
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.secondary_course}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Exam Status */}
-              {(selectedAdmissionDetail.exam_attendance_status || selectedAdmissionDetail.exam_status) && (
-                <>
-                  <hr className="border-slate-200 dark:border-slate-700" />
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Examination Status</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500 dark:text-slate-400">Attendance</Label>
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.exam_attendance_status?.replace("_", " ") || "-"}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500 dark:text-slate-400">Result</Label>
-                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 capitalize">{selectedAdmissionDetail.exam_status || "-"}</p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Form Data */}
-              {selectedAdmissionDetail.form_data && Object.keys(selectedAdmissionDetail.form_data).length > 0 && (
-                <>
-                  <hr className="border-slate-200 dark:border-slate-700" />
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Additional Form Data</h4>
-                    <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
-                      {Object.entries(selectedAdmissionDetail.form_data).map(([key, value]) => (
-                        <div key={key} className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                          <span className="text-xs text-slate-500 dark:text-slate-400 capitalize">{key.replace(/_/g, " ")}</span>
-                          <span className="text-sm text-slate-900 dark:text-slate-100 text-right">
-                            {typeof value === "boolean" ? (value ? "Yes" : "No") : String(value || "-")}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Attachments */}
-              <hr className="border-slate-200 dark:border-slate-700" />
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Attachments</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedAdmissionDetail.id_picture_path && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">ID Picture</Label>
-                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
-                    </div>
-                  )}
-                  {selectedAdmissionDetail.birth_certificate_path && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">Birth Certificate</Label>
-                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
-                    </div>
-                  )}
-                  {selectedAdmissionDetail.valid_id_path && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">Valid ID</Label>
-                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
-                    </div>
-                  )}
-                  {selectedAdmissionDetail.one_by_one_picture_path && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">1x1 Picture</Label>
-                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
-                    </div>
-                  )}
-                  {selectedAdmissionDetail.right_thumbmark_path && (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 dark:text-slate-400">Right Thumbmark</Label>
-                      <p className="text-sm text-green-600 dark:text-green-400">✓ Available</p>
-                    </div>
-                  )}
-                </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAdmissionPrint}
+                  className="border-slate-300 bg-white/80 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-900"
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  PDF view
+                </Button>
               </div>
             </div>
+          </DialogHeader>
+          {selectedAdmissionDetail && (
+            <div className="max-h-[75vh] space-y-4 overflow-y-auto px-6 py-5 [scrollbar-gutter:stable] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent dark:[&::-webkit-scrollbar-thumb]:bg-slate-700">
+              <section className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Student Summary</h4>
+                  <Badge className={`border text-xs font-semibold ${admissionStatusBadgeClass(selectedAdmissionDetail.status)}`}>
+                    {formatEnumLabel(selectedAdmissionDetail.status)}
+                  </Badge>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Full Name</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.full_name}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Email</p>
+                    <p className="mt-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.email}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Gender</p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.gender || "-"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Age</p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.age || "-"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Application Type</p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{formatEnumLabel(selectedAdmissionDetail.application_type || "admission")}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Primary Course</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.primary_course || "-"}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Program Information</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Primary Course</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.primary_course || "-"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Secondary Course / Scholarship</p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{selectedAdmissionDetail.secondary_course || "-"}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Examination Status</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Attendance</p>
+                    <Badge className={`mt-2 border ${examStatusBadgeClass(selectedAdmissionDetail.exam_attendance_status ?? "unset")}`}>
+                      {formatEnumLabel(selectedAdmissionDetail.exam_attendance_status)}
+                    </Badge>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+                    <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Result</p>
+                    <Badge className={`mt-2 border ${examStatusBadgeClass(selectedAdmissionDetail.exam_status ?? "unset")}`}>
+                      {formatEnumLabel(selectedAdmissionDetail.exam_status)}
+                    </Badge>
+                  </div>
+                </div>
+              </section>
+
+              {selectedAdmissionDetail.form_data && Object.keys(selectedAdmissionDetail.form_data).length > 0 && (
+                <section className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Additional Form Data</h4>
+                  <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent dark:[&::-webkit-scrollbar-thumb]:bg-slate-700">
+                    {Object.entries(selectedAdmissionDetail.form_data).map(([key, value]) => (
+                      <div key={key} className="grid grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0 dark:border-slate-800">
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{formatFormKey(key)}</p>
+                        <p className="break-words text-right text-sm text-slate-900 dark:text-slate-100">{formatFormValue(value)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              <section className="rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Attachments</h4>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { label: "ID Picture", available: Boolean(selectedAdmissionDetail.id_picture_path) },
+                    { label: "Birth Certificate", available: Boolean(selectedAdmissionDetail.birth_certificate_path) },
+                    { label: "Valid ID", available: Boolean(selectedAdmissionDetail.valid_id_path) },
+                    { label: "1x1 Picture", available: Boolean(selectedAdmissionDetail.one_by_one_picture_path) },
+                    { label: "Right Thumbmark", available: Boolean(selectedAdmissionDetail.right_thumbmark_path) },
+                  ].map((attachment) => (
+                    <div
+                      key={attachment.label}
+                      className={`rounded-xl border px-3 py-2.5 ${
+                        attachment.available
+                          ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-500/30 dark:bg-emerald-500/10"
+                          : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                      }`}
+                    >
+                      <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{attachment.label}</p>
+                      <p className={`mt-1 text-sm font-semibold ${attachment.available ? "text-emerald-700 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}>
+                        {attachment.available ? "Available" : "Not Submitted"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
             <Button variant="outline" onClick={() => setAdmissionDetailOpen(false)}>Close</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pdfPreviewOpen} onOpenChange={setPdfPreviewOpen}>
+        <DialogContent className="flex h-[94vh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden border border-slate-200 bg-slate-100 p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+          <DialogHeader className="border-b border-slate-200 bg-white px-5 py-3 text-left dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between gap-3 pr-8">
+              <div>
+                <DialogTitle className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">PDF View</DialogTitle>
+                <DialogDescription className="text-slate-600 dark:text-slate-300">
+                  TESDA registration form preview inside the portal.
+                </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleGeneratePdf}
+                  disabled={generatingPdf}
+                  className="bg-sky-600 text-white hover:bg-sky-700"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {generatingPdf ? "Generating..." : "Generate PDF"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPdfPreviewOpen(false)}
+                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-slate-200 p-3 dark:bg-slate-900">
+            <iframe
+              ref={pdfPreviewFrameRef}
+              title="TESDA Registration Form Preview"
+              srcDoc={pdfPreviewHtml}
+              className="h-full w-full border-0 bg-white"
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

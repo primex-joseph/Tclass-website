@@ -226,12 +226,22 @@ const DRAFT_TTL_MS = 3 * 60 * 1000;
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"];
 const LOCATION_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]*$/;
+const MIN_VOCATIONAL_AGE = 18;
 
 type AllowedFileType = "pdf" | "image";
 
 function hasAllowedExtension(fileName: string, extensions: string[]) {
   const lower = fileName.toLowerCase();
   return extensions.some((ext) => lower.endsWith(ext));
+}
+
+function getAdultBirthdateMaxIso(minAge: number) {
+  const today = new Date();
+  const maxDate = new Date(today.getFullYear() - minAge, today.getMonth(), today.getDate());
+  const yyyy = String(maxDate.getFullYear());
+  const mm = String(maxDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(maxDate.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 const NATIONALITY_OPTIONS = [
@@ -601,6 +611,7 @@ function VocationalPageContent() {
   const [pageLoading, setPageLoading] = useState(true);
   const searchParams = useSearchParams();
   const selectedProgram = searchParams.get("program") ?? ""; 
+  const maxAllowedBirthdate = getAdultBirthdateMaxIso(MIN_VOCATIONAL_AGE);
   const selectedProgramRequirements = selectedProgram ? PROGRAM_REQUIREMENTS[selectedProgram] : null;
   const [form, setForm] = useState<FormState>(defaultForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -801,8 +812,10 @@ function VocationalPageContent() {
     const hasHadBirthday =
       today.getMonth() > month - 1 || (today.getMonth() === month - 1 && today.getDate() >= day);
     if (!hasHadBirthday) age -= 1;
-    if (age >= 0) {
+    if (age >= MIN_VOCATIONAL_AGE) {
       setForm((prev) => ({ ...prev, age: String(age) }));
+    } else {
+      setForm((prev) => ({ ...prev, age: "" }));
     }
   }, [form.monthOfBirth, form.dayOfBirth, form.yearOfBirth]);
 
@@ -887,6 +900,13 @@ function VocationalPageContent() {
       birthDate.getDate() !== day
     ) {
       addError("birthDate");
+    } else {
+      let computedAge = currentYear - year;
+      const today = new Date();
+      const hasHadBirthday =
+        today.getMonth() > month - 1 || (today.getMonth() === month - 1 && today.getDate() >= day);
+      if (!hasHadBirthday) computedAge -= 1;
+      if (computedAge < MIN_VOCATIONAL_AGE) addError("birthDate");
     }
 
     if (!LOCATION_NAME_REGEX.test(form.birthplaceCity.trim())) addError("birthplaceCity");
@@ -950,7 +970,7 @@ function VocationalPageContent() {
         sex: "Sex is required.",
         civilStatus: "Civil Status is required.",
         employmentStatus: "Employment Status is required.",
-        birthDate: "Birthdate is required.",
+        birthDate: "Birthdate is required. Learner must be at least 18 years old.",
         birthplaceCity: "Birthplace City/Municipality is required.",
         birthplaceProvince: "Birthplace Province is required.",
         birthplaceRegion: "Birthplace Region is required.",
@@ -1505,6 +1525,7 @@ function VocationalPageContent() {
                   <Input
                     type="date"
                     className="dark:[color-scheme:dark]"
+                    max={maxAllowedBirthdate}
                     value={
                       form.yearOfBirth && form.monthOfBirth && form.dayOfBirth
                         ? `${form.yearOfBirth.padStart(4, "0")}-${form.monthOfBirth.padStart(2, "0")}-${form.dayOfBirth.padStart(2, "0")}`
@@ -1514,6 +1535,10 @@ function VocationalPageContent() {
                       const value = e.target.value;
                       if (!value) {
                         setForm((prev) => ({ ...prev, monthOfBirth: "", dayOfBirth: "", yearOfBirth: "", age: "" }));
+                        return;
+                      }
+                      if (value > maxAllowedBirthdate) {
+                        toast.error(`Learner must be at least ${MIN_VOCATIONAL_AGE} years old.`);
                         return;
                       }
                       const [year, month, day] = value.split("-");
