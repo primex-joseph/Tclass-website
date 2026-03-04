@@ -14,8 +14,8 @@ import {
 import {
   getStudentCurriculumEvaluation,
   getStudentEnrolledSubjects,
+  getStudentEnrollmentHistory,
   getStudentPeriods,
-  getStudentPreEnlisted,
 } from "./student-portal-cache";
 
 type RowValue = ReactNode[] | string[];
@@ -41,13 +41,6 @@ type EvaluationMatrixRow = {
   preReq: string;
 };
 
-type EnrollmentHistorySubjectRow = {
-  id: number;
-  status?: "draft" | "unofficial" | "official" | "rejected" | "dropped";
-  assessed_at?: string | null;
-  decided_at?: string | null;
-};
-
 type EnrollmentHistoryItem = {
   periodName: string;
   registrationId: string;
@@ -55,6 +48,16 @@ type EnrollmentHistoryItem = {
   statusLabel: string;
   dotClass: string;
   docs: string[];
+};
+
+type EnrollmentHistoryApiItem = {
+  period_id: number;
+  period_name: string;
+  registration_id: string;
+  registration_date?: string | null;
+  status?: "draft" | "unofficial" | "official";
+  status_label: string;
+  docs?: string[];
 };
 
 type EnrolledSubjectPeriod = {
@@ -400,6 +403,7 @@ function ReportOfGradesSection() {
   const [error, setError] = useState<string | null>(null);
   const [gradeRows, setGradeRows] = useState<GradeRow[]>([]);
   const [selectedTermId, setSelectedTermId] = useState<string>("");
+  const [defaultTermId, setDefaultTermId] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
@@ -408,7 +412,11 @@ function ReportOfGradesSection() {
         setLoading(true);
         setError(null);
         const res = await getStudentCurriculumEvaluation();
-        const rows = ((res as { evaluation?: CurriculumEvaluationApiRow[] }).evaluation ?? []).filter(
+        const payload = res as {
+          evaluation?: CurriculumEvaluationApiRow[];
+          next_term?: { year_level?: number | null; semester?: number | null } | null;
+        };
+        const rows = (payload.evaluation ?? []).filter(
           (row): row is CurriculumEvaluationApiRow =>
             Boolean(row?.code && row?.title && row?.year_level && row?.semester)
         );
@@ -424,10 +432,18 @@ function ReportOfGradesSection() {
           semester: Number(row.semester),
         }));
         setGradeRows(mapped);
+        const nextYearLevel = Number(payload.next_term?.year_level ?? 0);
+        const nextSemester = Number(payload.next_term?.semester ?? 0);
+        if (nextYearLevel > 0 && nextSemester > 0) {
+          setDefaultTermId(`${nextYearLevel}-${nextSemester}`);
+        } else {
+          setDefaultTermId("");
+        }
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof Error ? err.message : "Failed to load report of grades.");
         setGradeRows([]);
+        setDefaultTermId("");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -461,10 +477,14 @@ function ReportOfGradesSection() {
       setSelectedTermId("");
       return;
     }
+    if (defaultTermId && terms.some((t) => t.id === defaultTermId) && (!selectedTermId || !terms.some((t) => t.id === selectedTermId))) {
+      setSelectedTermId(defaultTermId);
+      return;
+    }
     if (!selectedTermId || !terms.some((t) => t.id === selectedTermId)) {
       setSelectedTermId(terms[0].id);
     }
-  }, [terms, selectedTermId]);
+  }, [defaultTermId, terms, selectedTermId]);
 
   const selectedRows = useMemo(() => {
     if (!selectedTermId) return [];
@@ -1107,52 +1127,20 @@ function EnrollmentHistorySection() {
       try {
         setLoading(true);
         setError(null);
-
-        const periodRes = await getStudentPeriods();
-        const periods = (periodRes as { periods?: Array<{ id: number; name: string }> }).periods ?? [];
-
-        const history = await Promise.all(
-          periods.map(async (period) => {
-            const [enrolledRes, preRes] = await Promise.all([
-              getStudentEnrolledSubjects(period.id),
-              getStudentPreEnlisted(period.id),
-            ]);
-
-            const enrolledPayload = enrolledRes as {
-              enrollment_status?: "not_enrolled" | "unofficial" | "official";
-              enrolled_subjects?: EnrollmentHistorySubjectRow[];
-            };
-            const prePayload = preRes as { pre_enlisted?: EnrollmentHistorySubjectRow[] };
-
-            const enrolledRows = enrolledPayload.enrolled_subjects ?? [];
-            const preRows = prePayload.pre_enlisted ?? [];
-            if (enrolledRows.length === 0 && preRows.length === 0) return null;
-
-            const hasOfficial = enrolledRows.some((row) => row.status === "official");
-            const hasUnofficial = enrolledRows.some((row) => row.status === "unofficial");
-            const statusLabel = hasOfficial ? "Officially Enrolled" : hasUnofficial ? "Unofficially Enrolled" : "Draft";
-
-            const dateCandidates = [
-              ...enrolledRows.map((row) => row.decided_at).filter(Boolean),
-              ...enrolledRows.map((row) => row.assessed_at).filter(Boolean),
-            ] as string[];
-            const latestDate = dateCandidates.length > 0 ? new Date(dateCandidates.sort().at(-1) ?? "").toLocaleString() : "-";
-
-            const sourceRows = enrolledRows.length > 0 ? enrolledRows : preRows;
-            const registrationId = sourceRows[0]?.id ? String(sourceRows[0].id) : "-";
-
-            return {
-              periodName: period.name,
-              registrationId,
-              registrationDate: latestDate,
-              statusLabel,
-              dotClass: hasOfficial ? "bg-emerald-500" : hasUnofficial ? "bg-amber-500" : "bg-blue-500",
-              docs: hasOfficial ? ["COR", "PRE-REG", "SOA"] : ["PRE-REG", "SOA"],
-            } satisfies EnrollmentHistoryItem;
-          })
-        );
-
-        const normalized = history.filter((item): item is EnrollmentHistoryItem => item !== null);
+        const payload = (await getStudentEnrollmentHistory()) as { history?: EnrollmentHistoryApiItem[] };
+        const normalized = (payload.history ?? []).map((item) => ({
+          periodName: item.period_name,
+          registrationId: String(item.registration_id ?? "-"),
+          registrationDate: item.registration_date ? new Date(item.registration_date).toLocaleString() : "-",
+          statusLabel: item.status_label,
+          dotClass:
+            item.status === "official"
+              ? "bg-emerald-500"
+              : item.status === "unofficial"
+                ? "bg-amber-500"
+                : "bg-blue-500",
+          docs: item.docs ?? ["PRE-REG", "SOA"],
+        }));
         setItems(normalized);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load enrollment history.");

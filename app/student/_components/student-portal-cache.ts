@@ -11,6 +11,7 @@ const singleCache = {
   me: {} as CacheEntry<unknown>,
   periods: {} as CacheEntry<unknown>,
   curriculumEvaluation: {} as CacheEntry<unknown>,
+  enrollmentHistory: {} as CacheEntry<unknown>,
 };
 
 const periodCache = {
@@ -76,6 +77,9 @@ export const getStudentPeriods = <T = unknown>(force = false) =>
 
 export const getStudentCurriculumEvaluation = <T = unknown>(force = false) =>
   loadSingle<T>(singleCache.curriculumEvaluation, () => apiFetch("/student/curriculum-evaluation") as Promise<T>, force);
+
+export const getStudentEnrollmentHistory = <T = unknown>(force = false) =>
+  loadSingle<T>(singleCache.enrollmentHistory, () => apiFetch("/student/enrollment-history") as Promise<T>, force);
 
 export const getStudentEnrolledSubjects = <T = unknown>(periodId: number, force = false) =>
   loadByPeriod<T>(

@@ -3140,35 +3140,25 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                         <p className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No users found.</p>
                       ) : filteredUsers.slice(0, 1).map((user) => (
                         <div key={user.id} className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-white/10 dark:bg-slate-950/30">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                <AvatarFallback className="text-xs bg-slate-100">
-                                  {user.name.split(' ').map(n => n[0]).join('')}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
-                                <p className="truncate text-xs text-slate-500">{user.email}</p>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback className="text-xs bg-slate-100">
+                                {user.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
+                              <p className="truncate text-xs text-slate-500">{user.email}</p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                <Badge variant={user.role === 'Student' ? 'secondary' : 'default'}>
+                                  {user.role}
+                                </Badge>
+                                <span className={user.status === 'active' ? 'text-green-600' : 'text-amber-600'}>
+                                  {user.status}
+                                </span>
+                                <span className="text-slate-500">{user.joined}</span>
                               </div>
                             </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
                           </div>
                         </div>
                       ))}
@@ -3192,19 +3182,18 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                             <TableHead>Role</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Joined</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {loadingUsers ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                              <TableCell colSpan={4} className="text-center text-slate-500 py-8">
                                 Loading users...
                               </TableCell>
                             </TableRow>
                           ) : filteredUsers.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                              <TableCell colSpan={4} className="text-center text-slate-500 py-8">
                                 No users found.
                               </TableCell>
                             </TableRow>
@@ -3241,25 +3230,6 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                                 </div>
                               </TableCell>
                               <TableCell className="text-slate-500">{user.joined}</TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openDeleteDialog(user)} className="text-red-600">
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
