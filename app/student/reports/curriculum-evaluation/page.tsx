@@ -43,6 +43,13 @@ const IT_CURRICULUM_FALLBACK: EvalRow[] = [
   { id: 1020, code: "NET101", title: "Networking I", units: 3, year_level: 3, semester: 2, grade: 1.5, result_status: "passed" },
 ];
 
+const formatSemesterLabel = (semester: number) => {
+  if (semester === 1) return "1st Semester";
+  if (semester === 2) return "2nd Semester";
+  if (semester === 3) return "Midyear / Summer";
+  return `Semester ${semester}`;
+};
+
 export default function CurriculumEvaluationPage() {
   const [rows, setRows] = useState<EvalRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +95,7 @@ export default function CurriculumEvaluationPage() {
               <p className="col-span-4">Name</p>
               <p className="col-span-1">Units</p>
               <p className="col-span-1">Yr</p>
-              <p className="col-span-1">Sem</p>
+              <p className="col-span-1">Semester</p>
               <p className="col-span-1">Grade</p>
               <p className="col-span-2">Remark</p>
             </div>
@@ -111,7 +118,7 @@ export default function CurriculumEvaluationPage() {
                   <span className="col-span-4 truncate">{row.title}</span>
                   <span className="col-span-1">{row.units}</span>
                   <span className="col-span-1">{row.year_level}</span>
-                  <span className="col-span-1">{row.semester}</span>
+                  <span className="col-span-1">{formatSemesterLabel(row.semester)}</span>
                   <span className="col-span-1">{row.grade ?? "-"}</span>
                   <span className="col-span-2">{row.result_status ?? "Pending"}</span>
                 </div>

@@ -576,7 +576,7 @@ export default function CalendarPage() {
 
         {/* Add/Edit Event Dialog */}
         <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent hideCloseButton className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <CalendarIcon className="h-5 w-5 text-blue-600" />

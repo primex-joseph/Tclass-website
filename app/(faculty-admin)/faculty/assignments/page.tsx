@@ -162,7 +162,7 @@ export default function FacultyAssignmentsPage() {
                   New Assignment
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
+              <DialogContent hideCloseButton className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Create New Assignment</DialogTitle>
                   <DialogDescription>Create a new assignment for your students.</DialogDescription>
@@ -318,7 +318,7 @@ export default function FacultyAssignmentsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent hideCloseButton className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Assignment</DialogTitle>
             <DialogDescription>Update assignment details.</DialogDescription>
@@ -367,7 +367,7 @@ export default function FacultyAssignmentsPage() {
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent hideCloseButton className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Assignment</DialogTitle>
             <DialogDescription>

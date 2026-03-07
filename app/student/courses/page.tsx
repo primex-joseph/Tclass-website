@@ -697,7 +697,7 @@ export default function CoursesPage() {
 
         {/* Contact Instructor Dialog */}
         <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent hideCloseButton className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-blue-600" />

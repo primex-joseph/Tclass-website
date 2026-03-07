@@ -765,7 +765,7 @@ function LoginPageContent() {
       </div>
 
       <Dialog open={forgotPasswordOpen} onOpenChange={(open) => (open ? setForgotPasswordOpen(true) : resetForgotPasswordFlow())}>
-        <DialogContent className="sm:max-w-lg p-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <DialogContent hideCloseButton className="sm:max-w-lg p-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <DialogHeader className="sr-only">
             <DialogTitle>Forgot password</DialogTitle>
             <DialogDescription>Recover your account password.</DialogDescription>

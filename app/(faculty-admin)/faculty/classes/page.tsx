@@ -157,7 +157,7 @@ export default function FacultyClassesPage() {
                   New Class
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
+              <DialogContent hideCloseButton className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Create New Class</DialogTitle>
                   <DialogDescription>Set up a new class for the semester.</DialogDescription>
@@ -250,7 +250,7 @@ export default function FacultyClassesPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editClassDialogOpen} onOpenChange={setEditClassDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent hideCloseButton className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Class</DialogTitle>
             <DialogDescription>Update class details.</DialogDescription>
@@ -296,7 +296,7 @@ export default function FacultyClassesPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent hideCloseButton className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Delete Class</DialogTitle>
             <DialogDescription>

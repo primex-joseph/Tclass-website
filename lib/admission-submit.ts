@@ -52,17 +52,37 @@ export async function submitAdmissionForm(input: AdmissionSubmitInput) {
   if (input.validIdImageFile) body.append("valid_id_image", input.validIdImageFile);
   if (input.validIdBackImageFile) body.append("valid_id_back_image", input.validIdBackImageFile);
 
-  const response = await fetch(`${baseUrl}/admission/submit`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-    },
-    body,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/admission/submit`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+      },
+      body,
+    });
+  } catch {
+    throw new Error("Unable to reach server. Please check your connection and try again.");
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = (payload as { message?: string }).message ?? "Admission submission failed.";
+    const typedPayload = payload as {
+      message?: string;
+      errors?: Record<string, string[] | string>;
+    };
+
+    const firstValidationMessage = typedPayload.errors
+      ? Object.values(typedPayload.errors)
+          .flatMap((value) => (Array.isArray(value) ? value : [value]))
+          .find((value) => typeof value === "string" && value.trim().length > 0)
+      : undefined;
+
+    const message =
+      (typeof firstValidationMessage === "string" && firstValidationMessage) ||
+      typedPayload.message ||
+      "Admission submission failed.";
+
     throw new Error(message);
   }
 

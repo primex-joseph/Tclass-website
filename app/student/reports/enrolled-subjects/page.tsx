@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -31,6 +31,11 @@ export default function EnrolledSubjectsReportPage() {
   const [status, setStatus] = useState<"not_enrolled" | "unofficial" | "official">("not_enrolled");
   const [totalUnits, setTotalUnits] = useState(0);
   const [loading, setLoading] = useState(true);
+  const periodIdRef = useRef("");
+
+  useEffect(() => {
+    periodIdRef.current = periodId;
+  }, [periodId]);
 
   useEffect(() => {
     const run = async () => {
@@ -52,19 +57,28 @@ export default function EnrolledSubjectsReportPage() {
 
   useEffect(() => {
     if (!periodId) return;
+    const currentPid = periodId;
     const run = async () => {
       try {
-        const res = await apiFetch(`/student/enrollments/enrolled-subjects?period_id=${periodId}`);
+        setLoading(true);
+        const res = await apiFetch(`/student/enrollments/enrolled-subjects?period_id=${currentPid}`);
         const payload = res as {
           enrollment_status: "not_enrolled" | "unofficial" | "official";
           enrolled_subjects: EnrolledSubject[];
           total_units: number;
         };
+        if (periodIdRef.current !== currentPid) return;
         setRows(payload.enrolled_subjects ?? []);
         setStatus(payload.enrollment_status ?? "not_enrolled");
         setTotalUnits(Number(payload.total_units ?? 0));
       } catch (error) {
+        if (periodIdRef.current !== currentPid) return;
+        setRows([]);
+        setStatus("not_enrolled");
+        setTotalUnits(0);
         toast.error(error instanceof Error ? error.message : "Failed to load enrolled subjects.");
+      } finally {
+        if (periodIdRef.current === currentPid) setLoading(false);
       }
     };
     run();

@@ -7,8 +7,9 @@ import { ChevronDown, ChevronRight, LogOut, Menu, Monitor, Moon, Search, Setting
 import toast from "react-hot-toast";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { LogoutModal } from "@/components/ui/logout-modal";
+import { GlobalSearchInput } from "@/components/shared/global-search-input";
+import { PortalHeader, PortalSidebar } from "@/components/shared/portal-shell";
 
 import {
   mobileMoreSections,
@@ -511,14 +512,9 @@ function StudentShellInner({
 
       <div className="-mb-24 -mt-16 md:mb-0">
         <div className="flex h-screen overflow-hidden bg-slate-50 font-[var(--font-geist-sans)] dark:bg-slate-950">
-          <div
-            className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
-              mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-            }`}
-            onClick={() => setMobileOpen(false)}
-          />
-
-          <aside
+          <PortalSidebar
+            mobileOpen={mobileOpen}
+            onBackdropClick={() => setMobileOpen(false)}
             className={`fixed inset-y-0 left-0 z-50 flex w-[90vw] max-w-80 flex-col border-r border-slate-200/80 bg-white shadow-2xl shadow-slate-900/10 transition-transform duration-300 dark:border-white/10 dark:bg-slate-900 lg:inset-y-0 lg:relative lg:w-64 lg:max-w-none lg:rounded-none lg:translate-x-0 lg:shadow-none ${
               mobileOpen ? "translate-x-0" : "-translate-x-full"
             }`}
@@ -568,10 +564,10 @@ function StudentShellInner({
                 </p>
               </div>
             </div>
-          </aside>
+          </PortalSidebar>
 
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
+            <PortalHeader className="border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
               <div className="px-3 pb-2 pt-2 sm:hidden">
                 <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50 p-2 shadow-sm dark:border-white/10 dark:from-slate-900 dark:to-slate-950">
                   <div className="flex items-center gap-2">
@@ -597,21 +593,15 @@ function StudentShellInner({
                   <span className="-ml-4 hidden text-base font-bold leading-none text-slate-900 dark:text-slate-100 sm:block md:hidden">TCLASS Student Portal</span>
                 </div>
                 <div className="flex-1" />
-                <div className="relative hidden w-44 sm:block lg:w-56">
-                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleSearchNavigate();
-                      }
-                    }}
-                    placeholder="Search sections..."
-                    className="h-8 lg:h-8 rounded-lg border-slate-200 bg-slate-50 pl-9 lg:pl-9 text-sm focus:bg-white dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/10"
-                  />
-                </div>
+                <GlobalSearchInput
+                  value={search}
+                  onChange={setSearch}
+                  onEnter={handleSearchNavigate}
+                  placeholder="Search sections..."
+                  className="hidden w-44 sm:block lg:w-56"
+                  inputClassName="h-8 rounded-lg border-slate-200 bg-slate-50 pl-10 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/10"
+                  iconClassName="h-3.5 w-3.5"
+                />
                 <div className="hidden text-right sm:block">
                   <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{now ? now.toLocaleTimeString() : "--:--:--"}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{now ? now.toLocaleDateString() : "---"}</p>
@@ -619,7 +609,7 @@ function StudentShellInner({
                 <div className="hidden h-5 w-px bg-slate-200 dark:bg-white/10 sm:block" />
                 <ProfileDropdown profile={sessionProfile} onLogout={() => setLogoutOpen(true)} />
               </div>
-            </header>
+            </PortalHeader>
 
             <main className="flex-1 overflow-y-auto overscroll-y-contain scroll-smooth pb-28 sm:pb-0">
               <div key={active} className="animate-fade-in-up p-3 pb-24 sm:p-6 sm:pb-6">

@@ -34,6 +34,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeIconButton } from "@/components/ui/theme-icon-button";
+import { GlobalSearchInput } from "@/components/shared/global-search-input";
+import { PortalHeader, PortalSidebar } from "@/components/shared/portal-shell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2459,7 +2461,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
   return (
     <div className="admin-page flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <aside className="hidden xl:flex xl:w-64 xl:flex-col xl:border-r xl:border-slate-200/80 xl:bg-white xl:dark:border-white/10 xl:dark:bg-slate-900">
+      <PortalSidebar className="hidden xl:flex xl:w-64 xl:flex-col xl:border-r xl:border-slate-200/80 xl:bg-white xl:dark:border-white/10 xl:dark:bg-slate-900">
         <div className="flex h-full flex-col">
           <div className="border-b border-slate-200/80 px-4 py-5 dark:border-white/10">
             <div className="flex flex-col items-center gap-3 text-center">
@@ -2606,11 +2608,11 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
             <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright · v1.0.0</p>
           </div>
         </div>
-      </aside>
+      </PortalSidebar>
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
+      <PortalHeader className="border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
         <div className="px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between gap-4">
             {/* Brand */}
@@ -2639,15 +2641,12 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
             {/* Right Section */}
             <div className="flex items-center gap-2 xl:gap-3 shrink-0">
-              <div className="relative hidden lg:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                  placeholder={headerSearchPlaceholder}
-                  className="w-44 rounded-full border-slate-200 bg-slate-50/90 pl-9 text-slate-700 placeholder:text-slate-500 focus-visible:bg-white lg:w-48 xl:w-56 2xl:w-64 dark:border-white/15 dark:bg-slate-900/85 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:bg-slate-900"
-                  value={headerSearchQuery}
-                  onChange={(e) => setHeaderSearchQuery(e.target.value)}
-                />
-              </div>
+              <GlobalSearchInput
+                value={headerSearchQuery}
+                onChange={setHeaderSearchQuery}
+                placeholder={headerSearchPlaceholder}
+                className="hidden lg:block lg:w-48 xl:w-56 2xl:w-64"
+              />
               {!mobileMenuOpen && (
                 <Button
                   variant="ghost"
@@ -2824,7 +2823,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
           </div>
         </div>
 
-      </header>
+      </PortalHeader>
 
       {/* Mobile Sidebar */}
       <div
@@ -3332,7 +3331,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                         <Button
                           type="button"
                           size="sm"
-                          className="hidden h-9 rounded-lg border border-blue-200 bg-blue-50 px-3.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 hover:text-blue-800 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 md:inline-flex"
+                          className="hidden h-9 rounded-lg border border-blue-600 bg-blue-600 px-3.5 text-sm font-semibold text-white shadow-sm shadow-blue-900/25 transition-colors hover:bg-blue-700 hover:border-blue-700 dark:border-blue-500 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700 md:inline-flex"
                           onClick={() => setViewAllAccountsOpen(true)}
                         >
                           View all
@@ -4467,6 +4466,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
         }}
       >
         <DialogContent
+          hideCloseButton
           className={`flex w-[calc(100vw-2rem)] overflow-visible bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 sm:max-w-[580px] sm:flex-col ${
             newUserForm.role === "admin" ? "sm:min-h-[560px]" : ""
           }`}
@@ -4488,7 +4488,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
               >
                 <SelectTrigger
                   id="new-user-role"
-                  className="h-11 rounded-xl border-slate-300 bg-white px-3 text-slate-900 shadow-sm transition-colors focus-visible:border-blue-400 focus-visible:ring-0 focus-visible:outline-none data-[state=open]:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:border-blue-400 dark:data-[state=open]:border-blue-400"
+                  className="h-11 rounded-xl border-slate-300 bg-white px-3 text-slate-900 shadow-sm transition-colors focus:ring-0 focus:ring-offset-0 focus-visible:border-blue-400 focus-visible:ring-0 focus-visible:outline-none data-[state=open]:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:border-blue-400 dark:data-[state=open]:border-blue-400"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -4581,7 +4581,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
       {/* Edit User Dialog */}
       <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
-        <DialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+        <DialogContent hideCloseButton className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-slate-100">Edit User</DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-400">
@@ -4928,7 +4928,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent hideCloseButton className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Reply to {replyTarget?.full_name ?? "Sender"}</DialogTitle>
             <DialogDescription>
@@ -5191,7 +5191,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
+        <DialogContent hideCloseButton>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
@@ -5218,7 +5218,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
           if (!open) setScheduleRecipientIds([]);
         }}
       >
-        <DialogContent className="sm:max-w-2xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
+        <DialogContent hideCloseButton className="sm:max-w-2xl border border-slate-200 bg-neutral-50 dark:border-slate-700 dark:bg-slate-950">
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-slate-100">Send Entrance Exam Schedule</DialogTitle>
             <DialogDescription className="text-slate-600 dark:text-slate-300">
@@ -5312,7 +5312,7 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
       </Dialog>
 
       <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
-        <DialogContent>
+        <DialogContent hideCloseButton>
           <DialogHeader>
             <DialogTitle>Reject Admission</DialogTitle>
             <DialogDescription>

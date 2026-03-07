@@ -159,10 +159,10 @@ export const evaluationRows = [
   ["1st Year - Summer", "NSTP 2", "ROTC/CWTS/LTS 2", "-", "Credited"],
   ["1st Year - Summer", "FSM 111", "Occupational Health and Safety", "-", "Passed"],
   ["1st Year - Summer", "FSM 112", "Food Selection, Preparation", "-", "Passed"],
-  ["2nd Year - 1st Sem", "EDUC 251", "Facilitating Learner-Centered Teaching", "EDUC 101", "Passed"],
-  ["2nd Year - 1st Sem", "EDUC 256", "Building and Enhancing Literacy Across Curriculum", "-", "Passed"],
-  ["2nd Year - 2nd Sem", "EDUC 255", "Curriculum Development and Evaluation II", "EDUC 251", "Passed"],
-  ["2nd Year - 2nd Sem", "EDUC 104", "Foundations of Special and Inclusive Education", "EDUC 101", "Credited"],
+  ["2nd Year - 1st Semester", "EDUC 251", "Facilitating Learner-Centered Teaching", "EDUC 101", "Passed"],
+  ["2nd Year - 1st Semester", "EDUC 256", "Building and Enhancing Literacy Across Curriculum", "-", "Passed"],
+  ["2nd Year - 2nd Semester", "EDUC 255", "Curriculum Development and Evaluation II", "EDUC 251", "Passed"],
+  ["2nd Year - 2nd Semester", "EDUC 104", "Foundations of Special and Inclusive Education", "EDUC 101", "Credited"],
 ];
 
 export const ledgerRows = [

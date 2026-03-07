@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import toast from "react-hot-toast";
 import { FileDown, Wand2, X } from "lucide-react";
 
@@ -74,6 +74,15 @@ const formatUnitLabel = (units: number) => {
   return `${normalized} ${normalized === 1 ? "unit" : "units"}`;
 };
 
+const formatSemesterLabel = (semester: number | string) => {
+  const value = Number(semester);
+  if (value === 1) return "1st Semester";
+  if (value === 2) return "2nd Semester";
+  if (value === 3) return "Midyear / Summer";
+  if (Number.isFinite(value) && value > 0) return `Semester ${value}`;
+  return "Semester";
+};
+
 const pickNextTerm = (rows: EvalRow[]): { year: number; sem: number } | null => {
   if (rows.length === 0) return null;
 
@@ -129,6 +138,12 @@ function StudentEnrollmentContent() {
   const [showMainDisclaimer, setShowMainDisclaimer] = useState(true);
   const [showSyncIssueDisclaimer, setShowSyncIssueDisclaimer] = useState(true);
   const [showLockedDisclaimer, setShowLockedDisclaimer] = useState(true);
+  const periodIdRef = useRef("");
+  const offeringsRequestRef = useRef(0);
+
+  useEffect(() => {
+    periodIdRef.current = periodId;
+  }, [periodId]);
 
   const mapEnrollmentRowToSubject = (row: {
     id: number;
@@ -188,6 +203,7 @@ function StudentEnrollmentContent() {
         section: string | null;
       }>;
     };
+    if (periodIdRef.current !== pid) return;
     setPreEnlisted((payload.pre_enlisted ?? []).map(mapEnrollmentRowToSubject));
   };
 
@@ -206,6 +222,7 @@ function StudentEnrollmentContent() {
         section: string | null;
       }>;
     };
+    if (periodIdRef.current !== pid) return;
     setEnrollmentStatus(payload.enrollment_status ?? "not_enrolled");
     setEnrolledSubjects((payload.enrolled_subjects ?? []).map(mapEnrollmentRowToSubject));
   };
@@ -218,10 +235,16 @@ function StudentEnrollmentContent() {
 
   useEffect(() => {
     if (!periodId) return;
+    const currentPid = periodId;
     const run = async () => {
       try {
-        await refreshEnrollmentLists(periodId);
+        await refreshEnrollmentLists(currentPid);
+        if (periodIdRef.current !== currentPid) return;
       } catch (error) {
+        if (periodIdRef.current !== currentPid) return;
+        setPreEnlisted([]);
+        setEnrolledSubjects([]);
+        setEnrollmentStatus("not_enrolled");
         setEnrollmentSyncConnected(false);
         setEnrollmentSyncError(error instanceof Error ? error.message : "Failed to load enrollment records from server.");
       }
@@ -264,6 +287,7 @@ function StudentEnrollmentContent() {
       return;
     }
 
+    const requestId = ++offeringsRequestRef.current;
     const run = async () => {
       try {
         const res = await apiFetch(
@@ -303,8 +327,10 @@ function StudentEnrollmentContent() {
             slotsLeft: Number(row.slots_left ?? 0),
           }));
 
+        if (requestId !== offeringsRequestRef.current) return;
         setAvailableSubjects(mapped);
       } catch {
+        if (requestId !== offeringsRequestRef.current) return;
         setAvailableSubjects([]);
       }
     };
@@ -464,14 +490,7 @@ function StudentEnrollmentContent() {
               : selectedCurriculumYear === "4"
                 ? "4th Year"
                 : `Year ${selectedCurriculumYear}`;
-      const semLabel =
-        selectedCurriculumSemester === "1"
-          ? "1st Semester"
-          : selectedCurriculumSemester === "2"
-            ? "2nd Semester"
-            : selectedCurriculumSemester === "3"
-              ? "Midyear/Summer"
-              : `Sem ${selectedCurriculumSemester}`;
+      const semLabel = formatSemesterLabel(selectedCurriculumSemester);
 
       toast.success(
         `Auto pre-enlist synced for ${yearLabel} ${semLabel}. Added ${addedCount} subject(s).`
@@ -526,7 +545,12 @@ function StudentEnrollmentContent() {
   };
 
   const openSubjectListPdf = () => {
-    const rows = enrolledSubjects.length > 0 ? enrolledSubjects : preEnlisted;
+    const rows =
+      enrollmentStatus === "official"
+        ? enrolledSubjects
+        : enrolledSubjects.length > 0
+          ? enrolledSubjects
+          : preEnlisted;
     if (rows.length === 0) {
       toast.error("No subject list available to print.");
       return;
@@ -583,7 +607,7 @@ function StudentEnrollmentContent() {
             </Badge>
             {targetTerm ? (
               <Badge variant="outline" className="rounded-full border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200">
-                Target: Year {targetTerm.year} / Sem {targetTerm.sem}
+                Target: Year {targetTerm.year} / {formatSemesterLabel(targetTerm.sem)}
               </Badge>
             ) : null}
           </div>
@@ -646,7 +670,7 @@ function StudentEnrollmentContent() {
           </div>
         )}
 
-        {enrollmentSyncConnected === true && false && (
+        {enrollmentSyncConnected === true && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
             Enrollment actions are synced to the backend. After clicking <span className="font-semibold">Assess</span>, admin can review them in <span className="font-semibold">Admin → Enrollments → Enrollment Requests</span>.
           </div>
@@ -731,7 +755,7 @@ function StudentEnrollmentContent() {
                 <SelectContent className="rounded-xl border-slate-200/90 dark:border-white/10">
                   {curriculumSemesterOptions.map((sem) => (
                     <SelectItem key={sem} value={String(sem)}>
-                      {sem === 1 ? "1st Semester" : sem === 2 ? "2nd Semester" : sem === 3 ? "Midyear / Summer" : `Semester ${sem}`}
+                      {formatSemesterLabel(sem)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -778,9 +802,9 @@ function StudentEnrollmentContent() {
               <CardTitle className="text-slate-900 dark:text-slate-100">Available Subjects</CardTitle>
               <CardDescription className="dark:text-slate-300">
                 {selectedCurriculumYear && selectedCurriculumSemester
-                  ? `Curriculum Evaluation target: Year ${selectedCurriculumYear} - Sem ${selectedCurriculumSemester}`
+                  ? `Curriculum Evaluation target: Year ${selectedCurriculumYear} - ${formatSemesterLabel(selectedCurriculumSemester)}`
                   : targetTerm
-                    ? `Suggested next term: Year ${targetTerm.year} - Sem ${targetTerm.sem}`
+                    ? `Suggested next term: Year ${targetTerm.year} - ${formatSemesterLabel(targetTerm.sem)}`
                     : "No curriculum term detected."}
               </CardDescription>
             </CardHeader>

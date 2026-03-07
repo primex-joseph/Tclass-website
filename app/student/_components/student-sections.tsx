@@ -98,10 +98,10 @@ type CurriculumEvaluationPayload = {
 const toTitleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 
 const semesterLabel = (semester: number) => {
-  if (semester === 1) return "1st Sem";
-  if (semester === 2) return "2nd Sem";
+  if (semester === 1) return "1st Semester";
+  if (semester === 2) return "2nd Semester";
   if (semester === 3) return "Summer";
-  return `Sem ${semester}`;
+  return `Semester ${semester}`;
 };
 
 const yearLevelLabel = (year: number) => {
@@ -1468,7 +1468,7 @@ function AcademicEvaluationMatrixSection() {
                     <span className="font-medium text-slate-900 dark:text-slate-100">{r.grade}</span>
                   </div>
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-slate-500 dark:text-slate-400">Pre-requisites</span>
+                    <span className="text-slate-500 dark:text-slate-400">Prerequisites</span>
                     <span className="text-right text-slate-900 dark:text-slate-100">{r.preReq}</span>
                   </div>
                 </div>
@@ -1490,7 +1490,7 @@ function AcademicEvaluationMatrixSection() {
                 <th className="w-20 px-4 py-3 text-left font-semibold">Units</th>
                 <th className="w-20 px-4 py-3 text-left font-semibold">Grade</th>
                 <th className="w-32 px-4 py-3 text-left font-semibold">Remark</th>
-                <th className="w-40 px-4 py-3 text-left font-semibold">Pre-requisites</th>
+                <th className="w-40 px-4 py-3 text-left font-semibold">Prerequisites</th>
               </tr>
             </thead>
             <tbody>

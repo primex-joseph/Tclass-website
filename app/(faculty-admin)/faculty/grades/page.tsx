@@ -326,7 +326,7 @@ export default function FacultyGradesPage() {
 
       {/* Edit Grade Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent hideCloseButton className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Grades - {selectedRecord?.student}</DialogTitle>
             <DialogDescription>Update student grades.</DialogDescription>

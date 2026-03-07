@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { VocationalPageSkeleton } from "@/components/ui/loading-states";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { submitAdmissionForm } from "@/lib/admission-submit";
+import { useFieldCompletionFlash } from "@/lib/use-field-completion-flash";
 
 import { Badge } from "@/components/ui/badge";
 import { ThemeIconButton } from "@/components/ui/theme-icon-button";
@@ -226,6 +227,8 @@ const DRAFT_TTL_MS = 3 * 60 * 1000;
 const IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png"]);
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"];
 const LOCATION_NAME_REGEX = /^[A-Za-z][A-Za-z\s.'-]*$/;
+const GMAIL_ADDRESS_REGEX = /^[a-z0-9._%+-]+@gmail\.com$/i;
+const MOBILE_NUMBER_REGEX = /^09\d{9}$/;
 
 type AllowedFileType = "pdf" | "image";
 
@@ -575,6 +578,9 @@ function VocationalPageContent() {
   const [nationalityOptions, setNationalityOptions] = useState<string[]>(["Filipino"]);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [submittedModalOpen, setSubmittedModalOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  useFieldCompletionFlash(formRef);
   const [isDraftReady, setIsDraftReady] = useState(false);
 
   const handleValidatedFileChange = (
@@ -746,6 +752,8 @@ function VocationalPageContent() {
     const addError = (key: RequiredFieldKey) => {
       if (!errors.includes(key)) errors.push(key);
     };
+    const normalizedEmail = form.emailAddress.trim().toLowerCase();
+    const normalizedContactNo = form.contactNo.replace(/\D/g, "");
 
     // VISUAL ORDER 1: Required Supporting Documents (appears first in UI)
     if (!birthCertificateFile) addError("birthCertificate");
@@ -771,12 +779,12 @@ function VocationalPageContent() {
     } else if (/\d/.test(form.region.trim())) {
       addError("region");
     }
-    if (!form.emailAddress.trim()) {
+    if (!normalizedEmail) {
       addError("emailAddress");
-    } else if (form.emailAddress.length > 254) {
+    } else if (normalizedEmail.length > 254 || !GMAIL_ADDRESS_REGEX.test(normalizedEmail)) {
       addError("emailAddress");
     }
-    if (!form.contactNo.trim()) addError("contactNo");
+    if (!MOBILE_NUMBER_REGEX.test(normalizedContactNo)) addError("contactNo");
     if (!form.nationality.trim()) addError("nationality");
 
     // VISUAL ORDER 4: Section 3 - Personal Information
@@ -849,8 +857,8 @@ function VocationalPageContent() {
         cityMunicipality: "City/Municipality is required.",
         province: "Province is required.",
         region: "Region is required. Number is not allowed in this input field.",
-        emailAddress: "Email Address is required and must not exceed 254 characters.",
-        contactNo: "Contact No. is required.",
+        emailAddress: "Email Address is required and must be a valid Gmail address (example@gmail.com).",
+        contactNo: "Contact No. must be 11 digits and start with 09.",
         nationality: "Nationality is required.",
         // Section 3 (Visual Order 4)
         sex: "Sex is required.",
@@ -872,7 +880,7 @@ function VocationalPageContent() {
         // Section 9 (Visual Order 8)
         privacyConsent: "Please select your Privacy Consent (Agree or Disagree).",
         // Section 10 (Visual Order 9)
-        applicantSignature: "Applicant's Signature is required.",
+        applicantSignature: "Applicant's Name is required.",
         dateAccomplished: "Date Accomplished is required.",
         oneByOnePicture: "1x1 Picture is required.",
         // Section 11 (Visual Order 10)
@@ -899,11 +907,11 @@ function VocationalPageContent() {
         gender: form.sex,
         primaryCourse: form.courseQualificationName,
         secondaryCourse: form.scholarshipType || null,
-        email: form.emailAddress,
+        email: form.emailAddress.trim().toLowerCase(),
         applicationType: "admission",
         validIdType: validIdType === "Others" ? `Others - ${validIdTypeOther.trim()}` : validIdType,
         facebookAccount: form.facebookAccount || null,
-        contactNo: form.contactNo || null,
+        contactNo: form.contactNo.replace(/\D/g, "") || null,
         enrollmentPurposes: form.enrollmentPurposes,
         enrollmentPurposeOthers: form.enrollmentPurposeOthers || null,
         formData: form,
@@ -930,11 +938,12 @@ function VocationalPageContent() {
         window.localStorage.removeItem(DIPLOMA_DRAFT_KEY);
       }
     } catch (error) {
-      const fallbackMessage = "Failed to submit admission.";
+      const fallbackMessage = "Failed to submit diploma enrollment.";
       const rawMessage = error instanceof Error ? error.message : fallbackMessage;
       const normalizedMessage = rawMessage
         .replace(/gender is required/gi, "Sex is required")
-        .replace(/The gender field is required\./gi, "Sex is required.");
+        .replace(/The gender field is required\./gi, "Sex is required.")
+        .replace(/applicant signature is required/gi, "Applicant's Name is required");
       
       // Map backend error messages to field keys for navigation
       const backendErrorMap: Record<string, RequiredFieldKey> = {
@@ -944,9 +953,12 @@ function VocationalPageContent() {
         "gender is required": "sex",
         "primary course is required": "courseQualificationName",
         "email is required": "emailAddress",
+        "email must be a valid email address": "emailAddress",
+        "email must be a valid gmail address": "emailAddress",
         "valid id front image upload is required": "validIdFront",
         "valid id back image upload is required": "validIdBack",
         "valid id type is required": "validIdType",
+        "contact no format is invalid": "contactNo",
         "please select at least one purpose": "enrollmentPurposeOthers",
         "please specify the purpose": "enrollmentPurposeOthers",
         "birth certificate upload is required": "birthCertificate",
@@ -1086,7 +1098,7 @@ function VocationalPageContent() {
     { label: "Valid ID Back", value: validIdBackImageFile ? "Uploaded" : "Missing" },
     { label: "ID Picture", value: idPictureFile ? "Uploaded" : "Missing" },
     { label: "1x1 Picture", value: oneByOnePictureFile ? "Uploaded" : "Missing" },
-    { label: "Right Thumbmark", value: rightThumbmarkFile ? "Uploaded" : "Missing" },
+    { label: "Right Thumbmark", value: "Manual on printed PDF" },
   ];
 
   if (pageLoading) {
@@ -1127,7 +1139,7 @@ function VocationalPageContent() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-5 pb-24 sm:space-y-6 sm:pb-0">
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-5 pb-24 sm:space-y-6 sm:pb-0">
           <Card className="elev-card border-blue-100/80 bg-white/90">
             <CardHeader>
               <CardTitle className="text-xl leading-tight text-blue-900 sm:text-2xl">Required Supporting Documents</CardTitle>
@@ -1215,9 +1227,17 @@ function VocationalPageContent() {
               <CardTitle className="text-blue-900">1. T2MIS Auto Generated</CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-2" data-field="uliNumber">
                 <Label>Unique Learner Identifier (ULI) Number</Label>
-                <Input value={form.uliNumber} onChange={(e) => setForm((prev) => ({ ...prev, uliNumber: e.target.value }))} />
+                <Input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Numbers only"
+                  value={form.uliNumber}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, uliNumber: e.target.value.replace(/\D/g, "") }))
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label>Entry Date</Label>
@@ -1331,15 +1351,33 @@ function VocationalPageContent() {
                   <Label>Email Address *</Label>
                   <Input
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder="name@gmail.com"
                     maxLength={254}
                     value={form.emailAddress}
                     onChange={(e) => setForm((prev) => ({ ...prev, emailAddress: e.target.value }))}
-                    className={form.emailAddress.length >= 254 ? "border-red-500 focus-visible:ring-red-500" : form.emailAddress.length >= 230 ? "border-amber-500 focus-visible:ring-amber-500" : ""}
+                    className={
+                      form.emailAddress.length > 0 && !GMAIL_ADDRESS_REGEX.test(form.emailAddress.trim().toLowerCase())
+                        ? "border-red-500 focus-visible:ring-red-500"
+                        : form.emailAddress.length >= 254
+                          ? "border-red-500 focus-visible:ring-red-500"
+                          : form.emailAddress.length >= 230
+                            ? "border-amber-500 focus-visible:ring-amber-500"
+                            : ""
+                    }
                   />
                   {form.emailAddress.length > 0 && (
-                    <p className={`text-xs ${form.emailAddress.length >= 254 ? "text-red-600 font-medium" : form.emailAddress.length >= 230 ? "text-amber-600" : "text-slate-500"}`}>
-                      {form.emailAddress.length >= 254 
+                    <p className={`text-xs ${
+                      !GMAIL_ADDRESS_REGEX.test(form.emailAddress.trim().toLowerCase())
+                        ? "text-red-600 font-medium"
+                        : form.emailAddress.length >= 254
+                          ? "text-red-600 font-medium"
+                          : form.emailAddress.length >= 230
+                            ? "text-amber-600"
+                            : "text-slate-500"
+                    }`}>
+                      {!GMAIL_ADDRESS_REGEX.test(form.emailAddress.trim().toLowerCase())
+                        ? "Use a valid Gmail address (example@gmail.com)."
+                        : form.emailAddress.length >= 254
                         ? "Maximum character limit reached (254)." 
                         : `${form.emailAddress.length}/254 characters`}
                     </p>
@@ -1648,7 +1686,7 @@ function VocationalPageContent() {
               <p className="text-sm text-slate-600">This is to certify that the information stated above is true and correct.</p>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2" data-field="applicantSignature">
-                  <Label>Applicant&apos;s Signature Over Printed Name *</Label>
+                  <Label>Applicant&apos;s Name *</Label>
                   <Input value={form.applicantSignature} onChange={(e) => setForm((prev) => ({ ...prev, applicantSignature: e.target.value }))} />
                 </div>
                 <div className="space-y-2" data-field="dateAccomplished">
@@ -1665,13 +1703,15 @@ function VocationalPageContent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <FileUploadField
-                    label="Right Thumbmark"
-                    accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-                    file={rightThumbmarkFile}
-                    helperText="Accepted: JPG, JPEG, PNG only, max 5MB."
-                    onFileChange={(file) => handleValidatedFileChange(file, setRightThumbmarkFile, "Right thumbmark", "image")}
+                  <Label>Right Thumbmark</Label>
+                  <Input
+                    value="To be marked personally on the generated PDF"
+                    disabled
+                    readOnly
                   />
+                  <p className="text-xs text-slate-500">
+                    Disabled in online form. Student/applicant will mark thumbmark manually on printed PDF.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1683,11 +1723,11 @@ function VocationalPageContent() {
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2" data-field="notedBySignature">
-                <Label>Signature Over Printed Name</Label>
+                <Label>Registrar/School Admin Name</Label>
                 <Input 
                   value={form.notedBySignature} 
                   onChange={(e) => setForm((prev) => ({ ...prev, notedBySignature: e.target.value }))}
-                  placeholder="Registrar/School Admin signature"
+                  placeholder="Registrar/School Admin name"
                 />
               </div>
               <div className="space-y-2" data-field="dateReceived">

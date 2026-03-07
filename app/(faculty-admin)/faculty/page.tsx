@@ -11,8 +11,9 @@ import {
   Settings, Sun, Moon, Monitor,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { LogoutModal } from "@/components/ui/logout-modal";
+import { GlobalSearchInput } from "@/components/shared/global-search-input";
+import { PortalHeader, PortalSidebar } from "@/components/shared/portal-shell";
 import { facultyProfile } from "./_components/faculty-data";
 import { HomeSection } from "./_components/home-section";
 import { ClassSchedulesSection } from "./_components/class-schedules-section";
@@ -495,16 +496,10 @@ export default function FacultyPage() {
 
   return (
     <div className="faculty-page flex h-screen overflow-hidden bg-slate-50 font-[var(--font-manrope)] dark:bg-slate-950">
-      {/* Mobile backdrop */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
-          mobileSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={() => setMobileSidebarOpen(false)}
-      />
-
       {/* Sidebar — CSS transform slide for mobile */}
-      <aside
+      <PortalSidebar
+        mobileOpen={mobileSidebarOpen}
+        onBackdropClick={() => setMobileSidebarOpen(false)}
         className={`
           fixed inset-y-2 left-0 z-50 flex w-[86vw] max-w-80 flex-col rounded-r-3xl
           border-r border-slate-200/80 bg-white
@@ -516,13 +511,13 @@ export default function FacultyPage() {
         `}
       >
         {sidebarContent}
-      </aside>
+      </PortalSidebar>
 
       {/* Main Content */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
 
         {/* ── Sticky Header ── */}
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
+        <PortalHeader className="border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95">
           <div className="px-3 pb-2 pt-2 sm:hidden">
             <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50 p-2.5 shadow-sm shadow-slate-900/5 dark:border-white/10 dark:from-slate-900 dark:to-slate-950">
               <div className="flex items-center gap-2">
@@ -582,21 +577,15 @@ export default function FacultyPage() {
           <div className="flex-1" />
 
           {/* Search */}
-          <div className="relative hidden w-44 sm:block lg:w-56">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  handleSearchNavigate();
-                }
-              }}
-              className="h-8 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm focus:bg-white dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/10"
-            />
-          </div>
+          <GlobalSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onEnter={handleSearchNavigate}
+            placeholder="Search..."
+            className="hidden w-44 sm:block lg:w-56"
+            inputClassName="h-8 rounded-lg border-slate-200 bg-slate-50 pl-10 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/10"
+            iconClassName="h-3.5 w-3.5"
+          />
 
           {/* Live clock */}
           <LiveClock />
@@ -607,7 +596,7 @@ export default function FacultyPage() {
           {/* Profile */}
           <ProfileDropdown onLogout={() => setShowLogoutModal(true)} />
           </div>
-        </header>
+        </PortalHeader>
 
         {/* ── Scrollable Content ── */}
         <main className="flex-1 overflow-y-auto overscroll-y-contain scroll-smooth pb-24 sm:pb-0">

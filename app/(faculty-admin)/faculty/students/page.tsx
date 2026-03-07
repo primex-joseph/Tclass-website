@@ -208,7 +208,7 @@ export default function FacultyStudentsPage() {
 
       {/* Email Dialog */}
       <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent hideCloseButton className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Send Email</DialogTitle>
             <DialogDescription>Send an email to {selectedStudent?.name}</DialogDescription>
@@ -238,7 +238,7 @@ export default function FacultyStudentsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent hideCloseButton className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Student</DialogTitle>
             <DialogDescription>Update student information.</DialogDescription>
@@ -302,7 +302,7 @@ export default function FacultyStudentsPage() {
 
       {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent hideCloseButton className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Remove Student</DialogTitle>
             <DialogDescription>

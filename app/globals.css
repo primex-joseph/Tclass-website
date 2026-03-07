@@ -693,6 +693,75 @@
   .motion-delay-400 { animation-delay: 400ms; }
 }
 
+@keyframes field-check-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.7);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.96);
+  }
+}
+
+@keyframes field-complete-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+  25% {
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.field-complete-flash {
+  position: relative;
+  border-radius: 0.75rem;
+  animation: field-complete-glow 1.6s ease-out;
+}
+
+.field-complete {
+  position: relative;
+  border-radius: 0.75rem;
+}
+
+.field-complete-flash::after {
+  content: "✓";
+  position: absolute;
+  right: -0.35rem;
+  top: -0.35rem;
+  height: 1.3rem;
+  width: 1.3rem;
+  border-radius: 9999px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px -12px rgba(22, 163, 74, 0.85);
+  pointer-events: none;
+  animation: field-check-pop 1.6s ease-out forwards;
+  z-index: 2;
+}
+
+.field-complete-control {
+  border-color: rgb(34 197 94 / 0.7) !important;
+  box-shadow: 0 0 0 1px rgb(34 197 94 / 0.25);
+}
+
 @layer utilities {
   .motion-fade-rise {
     animation: fadeUp 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;

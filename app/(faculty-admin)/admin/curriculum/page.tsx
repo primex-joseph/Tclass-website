@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlobalSearchInput } from "@/components/shared/global-search-input";
 
 type CurriculumVersion = {
   id: number;
@@ -69,6 +70,12 @@ type CurriculumSubjectView = {
 
 const programs = ["BS Information Technology", "BTVTED", "ICT Diploma", "Hospitality NCII", "Forklift NCII"];
 const mkRow = (): SubjectRow => ({ id: Date.now() + Math.random(), year_level: 1, semester: 1, code: "", title: "", units: "3", prerequisite_code: "" });
+const formatSemesterLabel = (semester: number) => {
+  if (semester === 1) return "1st Semester";
+  if (semester === 2) return "2nd Semester";
+  if (semester === 3) return "Midyear / Summer";
+  return `Semester ${semester}`;
+};
 
 const BSIT_TESDA_CURRICULUM_PRESET: SubjectPresetRow[] = [
   { year_level: 1, semester: 1, code: "CC101", title: "Introduction to Computing", units: "3", prerequisite_code: "" },
@@ -366,7 +373,12 @@ export default function AdminCurriculumPage() {
               <span className="-ml-4 hidden text-base font-bold text-slate-900 dark:text-slate-100 md:block">Tarlac Center for Learning and Skills Success</span>
             </div>
             <div className="flex flex-1 items-center justify-end gap-2 xl:gap-3">
-              <div className="relative hidden lg:block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search curriculum..." className="w-56 rounded-full border-slate-200 bg-slate-50/90 pl-9 dark:border-white/15 dark:bg-slate-900/85" /></div>
+              <GlobalSearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search curriculum..."
+                className="hidden w-56 lg:block"
+              />
               <Button type="button" variant="ghost" size="icon" className="hidden sm:inline-flex"><MessageSquare className="h-5 w-5" /></Button>
               <div className="hidden text-right sm:block"><p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{now ? now.toLocaleTimeString() : "--:--:--"}</p><p className="text-xs text-slate-500 dark:text-slate-400">{now ? now.toLocaleDateString() : "---"}</p></div>
               <AvatarActionsMenu initials="AD" onLogout={handleLogout} name="Administrator" subtitle="admin@tclass.local" triggerName="Administrator" triggerSubtitle="admin@tclass.local" triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10" fallbackClassName="bg-blue-600 text-white" />
@@ -391,7 +403,25 @@ export default function AdminCurriculumPage() {
             </div>
 
             {!isCurriculumListView && (
-            <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+            <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
+              <CardHeader><CardTitle className="text-slate-900 dark:text-slate-100">Important</CardTitle><CardDescription className="text-slate-600 dark:text-slate-400">What reflects to student enrollment now.</CardDescription></CardHeader>
+              <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/40">
+                  <ol className="space-y-1">
+                    <li>1. Upload curriculum version with subject rows.</li>
+                    <li>2. Activate the version for the program.</li>
+                    <li>3. Student curriculum evaluation + auto pre-enlist use the active version.</li>
+                  </ol>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200">
+                  PDF is stored for testing/reference. Subject rows are the actual data source (PDF auto-parsing is not installed on this machine yet).
+                </div>
+              </CardContent>
+            </Card>
+            )}
+
+            {!isCurriculumListView && (
+            <div className="space-y-6">
               <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
                 <CardHeader><CardTitle className="text-slate-900 dark:text-slate-100">Create Curriculum Version</CardTitle><CardDescription className="text-slate-600 dark:text-slate-400">Student auto-enlistment reflects the active version per program.</CardDescription></CardHeader>
                 <CardContent className="space-y-4">
@@ -417,54 +447,38 @@ export default function AdminCurriculumPage() {
                       PDF is stored for reference only. Enter/paste curriculum subjects manually below.
                     </p>
                   </div>
-                  <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Quick Paste Rows (optional)</Label><Textarea rows={3} value={bulkRowsText} onChange={(e) => setBulkRowsText(e.target.value)} placeholder="year, sem, code, title, units, prereq(optional)" className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80" /><Button type="button" variant="outline" onClick={parseBulk}>Parse Paste</Button></div>
+                  <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Quick Paste Rows (optional)</Label><Textarea rows={3} value={bulkRowsText} onChange={(e) => setBulkRowsText(e.target.value)} placeholder="year, semester, code, title, units, prerequisite (optional)" className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80" /><Button type="button" variant="outline" onClick={parseBulk}>Parse Paste</Button></div>
 
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-slate-950/40">
                     <div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Subject Rows</p><Button type="button" size="sm" variant="outline" onClick={addRow}><Plus className="mr-1 h-3.5 w-3.5" />Add</Button></div>
-                    <div className="mb-2 hidden lg:grid lg:grid-cols-[68px_68px_110px_1fr_80px_120px_40px] lg:gap-2 px-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</p>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Sem</p>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Code</p>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Title</p>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Units</p>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Prereq</p>
+                    <div className="mb-2 hidden px-2 lg:grid lg:grid-cols-[72px_104px_120px_minmax(220px,1fr)_90px_170px_44px] lg:gap-2 lg:[&>*]:text-center">
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</p>
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Semester</p>
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Code</p>
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Title</p>
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Units</p>
+                      <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Prerequisite</p>
                       <span />
                     </div>
                     <div className="space-y-2">
                       {subjectRows.map((r) => (
-                        <div key={r.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-slate-900/50 lg:grid-cols-[68px_68px_110px_1fr_80px_120px_40px]">
-                          <Input type="number" min={1} placeholder="Year" value={r.year_level} onChange={(e) => patchRow(r.id, { year_level: Number(e.target.value) || 1 })} />
-                          <Input type="number" min={1} max={3} placeholder="Sem" value={r.semester} onChange={(e) => patchRow(r.id, { semester: Number(e.target.value) || 1 })} />
-                          <Input value={r.code} onChange={(e) => patchRow(r.id, { code: e.target.value })} placeholder="Code" />
-                          <Input value={r.title} onChange={(e) => patchRow(r.id, { title: e.target.value })} placeholder="Title" />
-                          <Input value={r.units} onChange={(e) => patchRow(r.id, { units: e.target.value })} placeholder="Units" />
-                          <Input value={r.prerequisite_code} onChange={(e) => patchRow(r.id, { prerequisite_code: e.target.value })} placeholder="Prereq" />
+                        <div key={r.id} className="grid items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-slate-900/50 lg:grid-cols-[72px_104px_120px_minmax(220px,1fr)_90px_170px_44px] lg:[&>*]:justify-self-center">
+                          <Input type="number" min={1} placeholder="Year" value={r.year_level} onChange={(e) => patchRow(r.id, { year_level: Number(e.target.value) || 1 })} className="w-full text-center placeholder:text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+                          <Input type="number" min={1} max={3} placeholder="Semester" value={r.semester} onChange={(e) => patchRow(r.id, { semester: Number(e.target.value) || 1 })} className="w-full text-center placeholder:text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+                          <Input value={r.code} onChange={(e) => patchRow(r.id, { code: e.target.value })} placeholder="Code" className="w-full text-center placeholder:text-center" />
+                          <Input value={r.title} onChange={(e) => patchRow(r.id, { title: e.target.value })} placeholder="Title" className="w-full text-center placeholder:text-center" />
+                          <Input value={r.units} onChange={(e) => patchRow(r.id, { units: e.target.value })} placeholder="Units" className="w-full text-center placeholder:text-center" />
+                          <Input value={r.prerequisite_code} onChange={(e) => patchRow(r.id, { prerequisite_code: e.target.value })} placeholder="Prerequisite" className="w-full text-center placeholder:text-center" />
                           <Button type="button" size="icon" variant="ghost" onClick={() => removeRow(r.id)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       ))}
                     </div>
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Valid rows: {validRows.length}. Required fields per row: Year, Sem, Code, Title, Units.</p>
+                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Valid rows: {validRows.length}. Required fields per row: Year, Semester, Code, Title, Units.</p>
                   </div>
 
                   <div className="space-y-2"><Label className="text-slate-700 dark:text-slate-300">Notes</Label><Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="border-slate-200 bg-white dark:border-white/10 dark:bg-slate-950/80" /></div>
                   <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"><input type="checkbox" checked={activateNow} onChange={(e) => setActivateNow(e.target.checked)} />Activate after upload</label>
                   <Button onClick={saveCurriculum} disabled={saving} className="gap-2"><Upload className="h-4 w-4" />{saving ? "Saving..." : "Upload / Save Curriculum"}</Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-slate-200/80 bg-white/95 shadow-xl dark:border-white/10 dark:bg-slate-900/60">
-                <CardHeader><CardTitle className="text-slate-900 dark:text-slate-100">Important</CardTitle><CardDescription className="text-slate-600 dark:text-slate-400">What reflects to student enrollment now.</CardDescription></CardHeader>
-                <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-slate-950/40">
-                    <ol className="space-y-1">
-                      <li>1. Upload curriculum version with subject rows.</li>
-                      <li>2. Activate the version for the program.</li>
-                      <li>3. Student curriculum evaluation + auto pre-enlist use the active version.</li>
-                    </ol>
-                  </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-200">
-                    PDF is stored for testing/reference. Subject rows are the actual data source (PDF auto-parsing is not installed on this machine yet).
-                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -539,18 +553,18 @@ export default function AdminCurriculumPage() {
                     <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/90">
                       <tr className="text-left text-slate-600 dark:text-slate-300">
                         <th className="px-3 py-2">Year</th>
-                        <th className="px-3 py-2">Sem</th>
+                        <th className="px-3 py-2">Semester</th>
                         <th className="px-3 py-2">Code</th>
                         <th className="px-3 py-2">Title</th>
                         <th className="px-3 py-2">Units</th>
-                        <th className="px-3 py-2">Prereq</th>
+                        <th className="px-3 py-2">Prerequisite</th>
                       </tr>
                     </thead>
                     <tbody>
                       {viewSubjects.map((subject) => (
                         <tr key={subject.id} className="border-t border-slate-100 dark:border-white/10">
                           <td className="px-3 py-2">{subject.year_level}</td>
-                          <td className="px-3 py-2">{subject.semester}</td>
+                          <td className="px-3 py-2">{formatSemesterLabel(subject.semester)}</td>
                           <td className="px-3 py-2 font-medium">{subject.code}</td>
                           <td className="px-3 py-2">{subject.title}</td>
                           <td className="px-3 py-2">{subject.units}</td>
