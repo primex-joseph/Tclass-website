@@ -1066,7 +1066,7 @@ function HomeContent() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:auto-rows-fr xl:grid-cols-3">
-        <Panel className="h-full">
+        <Panel className="h-full order-2 sm:order-1">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">Enrolled Subjects Statistics</h2>
           <div className="mt-4 space-y-3">
             {loading
@@ -1091,7 +1091,7 @@ function HomeContent() {
           </div>
         </Panel>
 
-        <Panel className="flex h-full flex-col">
+        <Panel className="flex h-full flex-col order-3 sm:order-2">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">Completion Overview</h2>
           <div className="mt-5 flex flex-1 items-center justify-center">
             {loading ? (
@@ -1134,7 +1134,7 @@ function HomeContent() {
           </div>
         </Panel>
 
-        <Panel className="flex h-full flex-col">
+        <Panel className="flex h-full flex-col order-1 sm:order-3">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600 dark:text-slate-300">Your Schedule Today</h2>
           <div className="mt-4 flex flex-1 flex-col space-y-3">
             {loading ? (
