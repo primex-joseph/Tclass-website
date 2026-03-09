@@ -1253,6 +1253,7 @@ export default function LandingPage() {
               © {new Date().getFullYear()} PGT - TCLASS. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
+              <ThemeIconButton />
               <Link
                 href="/privacy"
                 className="rounded-full border border-transparent px-3 py-2 text-sm text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-400 dark:hover:border-blue-500/30 dark:hover:bg-blue-500/10 dark:hover:text-blue-300"

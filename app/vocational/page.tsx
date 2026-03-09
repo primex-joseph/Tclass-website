@@ -850,6 +850,25 @@ function VocationalPageContent() {
     }));
   };
 
+  const selectSingleArrayValue = (
+    key: "civilStatus" | "educationalAttainment" | "learnerClassifications" | "enrollmentPurposes",
+    value: string
+  ) => {
+    setForm((prev) => {
+      const next: FormState = {
+        ...prev,
+        [key]: [value],
+      };
+      if (key === "learnerClassifications" && value !== "Others") {
+        next.learnerClassificationOthers = "";
+      }
+      if (key === "enrollmentPurposes" && value !== "Others") {
+        next.enrollmentPurposeOthers = "";
+      }
+      return next;
+    });
+  };
+
   const validateBeforeSubmit = () => {
     const errors: RequiredFieldKey[] = [];
     const addError = (key: RequiredFieldKey) => {
@@ -1542,7 +1561,7 @@ function VocationalPageContent() {
                   <div className="space-y-1">
                     {civilStatuses.map((item) => (
                       <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
-                        <input type="checkbox" checked={form.civilStatus.includes(item)} onChange={() => toggleArrayValue("civilStatus", item)} />
+                        <input type="checkbox" checked={form.civilStatus.includes(item)} onChange={() => selectSingleArrayValue("civilStatus", item)} />
                         {item}
                       </label>
                     ))}
@@ -1634,7 +1653,7 @@ function VocationalPageContent() {
                 <div className="grid md:grid-cols-3 gap-2">
                   {educationalAttainments.map((item) => (
                     <label key={item} className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm leading-snug transition-colors hover:bg-blue-50/70 sm:items-center sm:px-0 sm:py-0 dark:hover:bg-white/5">
-                      <input type="checkbox" checked={form.educationalAttainment.includes(item)} onChange={() => toggleArrayValue("educationalAttainment", item)} />
+                      <input type="checkbox" checked={form.educationalAttainment.includes(item)} onChange={() => selectSingleArrayValue("educationalAttainment", item)} />
                       {item}
                     </label>
                   ))}
@@ -1685,13 +1704,7 @@ function VocationalPageContent() {
                     <input
                       type="checkbox"
                       checked={form.learnerClassifications.includes(item)}
-                      onChange={() => {
-                        const removingOthers = item === "Others" && form.learnerClassifications.includes("Others");
-                        toggleArrayValue("learnerClassifications", item);
-                        if (removingOthers) {
-                          setForm((prev) => ({ ...prev, learnerClassificationOthers: "" }));
-                        }
-                      }}
+                      onChange={() => selectSingleArrayValue("learnerClassifications", item)}
                     />
                     {item}
                   </label>
@@ -1866,12 +1879,7 @@ function VocationalPageContent() {
                     <input
                       type="checkbox"
                       checked={form.enrollmentPurposes.includes(item)}
-                      onChange={() => {
-                        toggleArrayValue("enrollmentPurposes", item);
-                        if (item === "Others" && form.enrollmentPurposes.includes("Others")) {
-                          setForm((prev) => ({ ...prev, enrollmentPurposeOthers: "" }));
-                        }
-                      }}
+                      onChange={() => selectSingleArrayValue("enrollmentPurposes", item)}
                     />
                     {item}
                   </label>

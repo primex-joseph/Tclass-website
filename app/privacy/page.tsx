@@ -4,6 +4,7 @@ import { ArrowLeft, FileBadge2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import {
   policyContactEmail,
   policyEffectiveDate,
@@ -54,7 +55,8 @@ export default function PrivacyPage() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <ThemeIconButton />
               <Button asChild variant="outline" className="rounded-xl">
                 <Link href="/">
                   <ArrowLeft className="mr-2 h-4 w-4" />

@@ -4,6 +4,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemeIconButton } from "@/components/ui/theme-icon-button";
 import { policyEffectiveDate, policyWebsite } from "@/lib/site-policies";
 
 export const metadata: Metadata = {
@@ -41,7 +42,8 @@ export default function ContractPage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <ThemeIconButton />
                 <Button asChild variant="outline" className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
                   <Link href="/">
                     <ArrowLeft className="mr-2 h-4 w-4" />
