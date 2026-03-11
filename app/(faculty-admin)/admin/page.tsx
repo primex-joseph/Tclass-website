@@ -510,7 +510,7 @@ const isAdminTab = (value: string | null | undefined): value is AdminSectionTab 
 const getAdminTabHref = (tab: AdminSectionTab) =>
   tab === DEFAULT_ADMIN_TAB ? "/admin" : `/admin?tab=${tab}`;
 
-export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) {
+function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statsLoadedRef = useRef(false);
@@ -2534,6 +2534,13 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 Management
               </p>
               <Link
+                href="/admin/programs"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+              >
+                <BookOpen className="h-4 w-4" />
+                Programs
+              </Link>
+              <Link
                 href={getAdminTabHref("departments")}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
                   activeAdminTab === "departments"
@@ -2905,6 +2912,16 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 Reports
               </button>
               <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push("/admin/programs");
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                <BookOpen className="h-4 w-4" />
+                Programs
+              </button>
+              <button
                 onClick={() => setAdminTabFromMobile("departments")}
                 className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                   activeAdminTab === "departments"
@@ -3035,6 +3052,16 @@ export function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboard
                 className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Users
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen(false);
+                  router.push("/admin/programs");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Programs
               </button>
               <button
                 type="button"
