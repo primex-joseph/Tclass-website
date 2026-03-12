@@ -51,12 +51,18 @@ function CatalogIcon({ iconKey, className }: { iconKey: string; className?: stri
 export function ProgramCard({ program, enrollPath, index = 0 }: ProgramCardProps) {
   const theme = getCatalogTheme(program.theme_key);
   const isInactive = !program.is_active;
+  const hasSlotLimit = typeof program.slots_limit === "number" && Number.isFinite(program.slots_limit) && program.slots_limit > 0;
+  const enrolledCount = Math.max(0, Number(program.enrolled_count ?? 0));
+  const computedSlotsLeft = hasSlotLimit ? Math.max(0, Number(program.slots_limit) - enrolledCount) : null;
+  const slotsLeft = typeof program.slots_left === "number" ? Math.max(0, program.slots_left) : computedSlotsLeft;
+  const isNoSlotsAvailable = Boolean(program.is_limited_slots && hasSlotLimit && enrolledCount >= Number(program.slots_limit));
+  const isUnavailable = isInactive || isNoSlotsAvailable;
 
   return (
     <Card
       className={cn(
         "group relative flex h-full flex-col overflow-hidden border-0 bg-white/80 shadow-lg shadow-slate-200/50 backdrop-blur-sm transition-all duration-300 dark:bg-slate-900/80 dark:shadow-black/20",
-        isInactive
+        isUnavailable
           ? "opacity-80"
           : "hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-300/50 dark:hover:shadow-black/30",
       )}
@@ -79,15 +85,20 @@ export function ProgramCard({ program, enrollPath, index = 0 }: ProgramCardProps
                 Limited slots
               </Badge>
             ) : null}
+            {isNoSlotsAvailable ? (
+              <Badge className="border border-rose-300/50 bg-rose-500/35 text-white backdrop-blur-sm">
+                No slots available
+              </Badge>
+            ) : null}
             <Badge
               className={cn(
                 "border text-white backdrop-blur-sm",
-                isInactive
+                isUnavailable
                   ? "border-rose-300/50 bg-rose-500/35"
                   : "border-emerald-300/50 bg-emerald-500/30",
               )}
             >
-              {isInactive ? "Inactive" : "Active"}
+              {isNoSlotsAvailable ? "Full" : isInactive ? "Inactive" : "Active"}
             </Badge>
           </div>
         </div>
@@ -114,14 +125,20 @@ export function ProgramCard({ program, enrollPath, index = 0 }: ProgramCardProps
             {program.credential_label}
           </span>
         </div>
+        {program.is_limited_slots && hasSlotLimit ? (
+          <p className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+            Slots: {enrolledCount}/{program.slots_limit} enrolled
+            {typeof slotsLeft === "number" ? ` • ${slotsLeft} left` : ""}
+          </p>
+        ) : null}
 
         <div className="mt-5 pt-2">
-          {isInactive ? (
+          {isUnavailable ? (
             <Button
               disabled
               className="w-full rounded-xl bg-slate-300 font-semibold text-slate-600 opacity-100 dark:bg-slate-800 dark:text-slate-400"
             >
-              Enrollment Unavailable
+              {isNoSlotsAvailable ? "No Slots Available" : "Enrollment Unavailable"}
             </Button>
           ) : (
             <Link href={`${enrollPath}?program=${encodeURIComponent(program.title)}`}>

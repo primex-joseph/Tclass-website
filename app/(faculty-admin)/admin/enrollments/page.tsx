@@ -13,7 +13,6 @@ import {
   CheckCircle,
   FileText,
   MessageSquare,
-  Search,
   School,
 } from "lucide-react";
 
@@ -23,6 +22,7 @@ import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlobalSearchInput } from "@/components/shared/global-search-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -265,6 +265,16 @@ export default function AdminEnrollmentsPage() {
                 <Building2 className="h-4 w-4" />
                 Departments
               </Link>
+              <div className="pl-9">
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
+                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                </Button>
+              </div>
+              <div className="pl-9">
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
+                  <Link href="/admin/departments/courses-list"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Courses List</Link>
+                </Button>
+              </div>
               <Link
                 href="/admin/admissions"
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
@@ -309,15 +319,12 @@ export default function AdminEnrollmentsPage() {
               </div>
 
               <div className="flex flex-1 items-center justify-end gap-2 xl:gap-3">
-                <div className="relative hidden lg:block">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    placeholder="Search sections..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-44 rounded-full border-slate-200 bg-slate-50/90 pl-9 text-slate-700 placeholder:text-slate-500 focus-visible:bg-white lg:w-48 xl:w-56 2xl:w-64 dark:border-white/15 dark:bg-slate-900/85 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus-visible:bg-slate-900"
-                  />
-                </div>
+                <GlobalSearchInput
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search sections..."
+                  className="hidden lg:block lg:w-48 xl:w-56 2xl:w-64"
+                />
                 <Button
                   type="button"
                   variant="ghost"
@@ -354,7 +361,7 @@ export default function AdminEnrollmentsPage() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto bg-slate-50 dark:bg-[radial-gradient(circle_at_top,rgba(30,64,175,0.16),transparent_45%),linear-gradient(180deg,#020617,#020b16_55%,#020617)]">
-          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+          <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
             <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Enrollment Management</h1>

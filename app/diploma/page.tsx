@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { VocationalPageSkeleton } from "@/components/ui/loading-states";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { submitAdmissionForm } from "@/lib/admission-submit";
+import { getPreferredSignatoryNameRemote, ORG_CHART_UPDATED_EVENT } from "@/lib/org-chart-signatories";
 import { useFieldCompletionFlash } from "@/lib/use-field-completion-flash";
 
 import { Badge } from "@/components/ui/badge";
@@ -730,6 +731,36 @@ function VocationalPageContent() {
     setForm((prev) => ({ ...prev, disabilityCauses: [] }));
   }, [form.disabilityTypes, form.disabilityCauses]);
 
+  const applyNotedByFromChart = useCallback(() => {
+    void (async () => {
+      const signatoryName = await getPreferredSignatoryNameRemote();
+      setForm((prev) => {
+        if (prev.notedBySignature === signatoryName) return prev;
+        return { ...prev, notedBySignature: signatoryName };
+      });
+    })();
+  }, []);
+
+  const resetFormToDefaults = useCallback(() => {
+    void (async () => {
+      const signatoryName = await getPreferredSignatoryNameRemote();
+      setForm({ ...defaultForm, notedBySignature: signatoryName });
+    })();
+  }, []);
+
+  useEffect(() => {
+    applyNotedByFromChart();
+    const handleOrgChartUpdate = () => applyNotedByFromChart();
+    const timer = window.setInterval(() => applyNotedByFromChart(), 10000);
+    window.addEventListener(ORG_CHART_UPDATED_EVENT, handleOrgChartUpdate);
+    window.addEventListener("storage", handleOrgChartUpdate);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(ORG_CHART_UPDATED_EVENT, handleOrgChartUpdate);
+      window.removeEventListener("storage", handleOrgChartUpdate);
+    };
+  }, [applyNotedByFromChart]);
+
   const toggleArrayValue = (
     key:
       | "civilStatus"
@@ -923,6 +954,7 @@ function VocationalPageContent() {
       const fullName = [form.firstName, form.middleName, form.lastName, form.extensionName]
         .filter((value) => value.trim().length > 0)
         .join(" ");
+      const resolvedNotedByName = (await getPreferredSignatoryNameRemote()) || form.notedBySignature;
 
       const response = await submitAdmissionForm({
         fullName,
@@ -937,7 +969,7 @@ function VocationalPageContent() {
         contactNo: form.contactNo.replace(/\D/g, "") || null,
         enrollmentPurposes: form.enrollmentPurposes,
         enrollmentPurposeOthers: form.enrollmentPurposeOthers || null,
-        formData: form,
+        formData: { ...form, notedBySignature: resolvedNotedByName },
         idPictureFile,
         oneByOnePictureFile,
         rightThumbmarkFile,
@@ -947,7 +979,7 @@ function VocationalPageContent() {
       });
 
       toast.success((response as { message?: string }).message ?? "Diploma enrollment submitted successfully.");
-      setForm(defaultForm);
+      resetFormToDefaults();
       setIdPictureFile(null);
       setOneByOnePictureFile(null);
       setRightThumbmarkFile(null);
@@ -1758,9 +1790,11 @@ function VocationalPageContent() {
                 <Label>Registrar/School Admin Name</Label>
                 <Input 
                   value={form.notedBySignature} 
-                  onChange={(e) => setForm((prev) => ({ ...prev, notedBySignature: e.target.value }))}
-                  placeholder="Registrar/School Admin name"
+                  readOnly
+                  aria-readonly="true"
+                  placeholder="Not set in Organizational Chart"
                 />
+                <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; School Organizational Chart signatory role.</p>
               </div>
               <div className="space-y-2" data-field="dateReceived">
                 <Label>Date Received</Label>
@@ -1818,7 +1852,7 @@ function VocationalPageContent() {
                 "Review and Submit"
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setForm(defaultForm)} className="w-full sm:w-auto">
+            <Button type="button" variant="outline" onClick={resetFormToDefaults} className="w-full sm:w-auto">
               Reset
             </Button>
           </div>

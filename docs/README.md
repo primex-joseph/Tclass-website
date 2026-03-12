@@ -2,10 +2,13 @@
 
 ## Start Here
 - `../README.md` - frontend overview
-- `./frontend-setup.md` - frontend local setup
-- `./WORKSTATION_SETUP_CHECKLIST.md` - full workstation checklist
+- `../LOCAL_SETUP.md` - full local frontend + backend setup
+- `./frontend-setup.md` - frontend-only setup
+- `../SETUP_CHECKLIST.md` - fast setup checklist
+- `./WORKSTATION_SETUP_CHECKLIST.md` - workstation checklist
+- `./LIVE_SERVER_SETUP.md` - production/live deployment guide
 - `./AI_PROMPT.md` - AI handoff/context prompt
-- `./REVIEW_2026-03-09.md` - latest engineering review snapshot
+- `./REVIEW_2026-03-09.md` - engineering review snapshot
 
 ## Repositories
 - Frontend: `tclass-v1-frontend`

@@ -73,7 +73,6 @@ import {
   Calendar,
   CornerUpLeft,
   CheckCheck,
-  Trash,
   Eye,
   EyeOff,
   FileText,
@@ -256,7 +255,6 @@ const ADMIN_TABS: AdminSectionTab[] = [
   "admissions-masterlist",
   "vocationals-masterlist",
 ];
-const normalizeSearchValue = (value: string) => value.toLowerCase().replace(/\s+/g, " ").trim();
 const PRINT_LEARNER_CLASSIFICATIONS = [
   "4Ps Beneficiary",
   "Agrarian Reform Beneficiary",
@@ -602,7 +600,6 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingAdmissions, setLoadingAdmissions] = useState(false);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [recentCredentials, setRecentCredentials] = useState<{ fullName: string; email: string; studentNumber: string; temporaryPassword: string }[]>([]);
   const [activeAdminTab, setActiveAdminTab] = useState<AdminSectionTab>(initialAdminTab);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -848,7 +845,6 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
       if (!force && departmentsLoadedRef.current) return;
 
       departmentsLoadingRef.current = true;
-      setLoadingDepartments(true);
       try {
         const response = await apiFetch("/admin/departments-overview");
         const rows = (response as { departments?: Department[] }).departments ?? [];
@@ -858,7 +854,6 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
         setDepartments([]);
       } finally {
         departmentsLoadingRef.current = false;
-        setLoadingDepartments(false);
       }
     },
     []
@@ -1909,15 +1904,6 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     ? vocationalTrends
         .filter((trend) => trend.program.toLowerCase().includes(universalTerm))
     : [];
-  const searchedCourses = useMemo(() => {
-    const q = normalizeSearchValue(courseSearchQuery);
-    if (!q) return departments;
-    const queryTokens = q.split(" ").filter(Boolean);
-    return departments.filter((dept) => {
-      const searchable = normalizeSearchValue(`${dept.name} ${dept.students} ${dept.students === 1 ? "student" : "students"}`);
-      return queryTokens.every((token) => searchable.includes(token));
-    });
-  }, [departments, courseSearchQuery]);
   const totalUniversalMatches =
     matchedUsers.length +
     matchedDepartments.length +
@@ -2541,16 +2527,34 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 Programs
               </Link>
               <Link
-                href={getAdminTabHref("departments")}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
-                  activeAdminTab === "departments"
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
-                }`}
+                href="/admin/departments"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
               >
                 <Building2 className="h-4 w-4" />
                 Departments
               </Link>
+              <div className="pl-9">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
+                  asChild
+                >
+                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                </Button>
+              </div>
+              <div className="pl-9">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
+                  asChild
+                >
+                  <Link href="/admin/departments/courses-list"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Courses List</Link>
+                </Button>
+              </div>
               <Link
                 href={getAdminTabHref("admissions")}
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
@@ -2922,12 +2926,11 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 Programs
               </button>
               <button
-                onClick={() => setAdminTabFromMobile("departments")}
-                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                  activeAdminTab === "departments"
-                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
-                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                }`}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  router.push("/admin/departments");
+                }}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
               >
                 <Building2 className="h-4 w-4" />
                 Departments
@@ -3066,7 +3069,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
               <button
                 type="button"
                 onClick={() => {
-                  navigateToAdminTab("departments");
+                  router.push("/admin/departments");
                   setMobileSearchOpen(false);
                 }}
                 className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -3139,7 +3142,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                             key={`universal-department-${department.id}`}
                             type="button"
                             onClick={() => {
-                              navigateToAdminTab("departments");
+                              router.push("/admin/departments");
                               setMobileSearchOpen(false);
                             }}
                             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800"
@@ -3247,8 +3250,14 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
         <div className="px-4 pt-6 pb-24 sm:px-6 sm:pb-6">
         {/* Welcome Section */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Dashboard</h1>
-          <p className="text-slate-600 mt-1">Overview of school operations and management.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+            {activeAdminTab === "departments" ? "Departments Management" : "Admin Dashboard"}
+          </h1>
+          <p className="text-slate-600 mt-1">
+            {activeAdminTab === "departments"
+              ? "Manage departments, leadership, and faculty allocations."
+              : "Overview of school operations and management."}
+          </p>
         </div>
 
         {activeAdminTab === "users" && (
@@ -3584,68 +3593,18 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
               </TabsContent>
 
               <TabsContent value="departments" className="mt-6">
-                <Card className="h-[460px] lg:h-[520px] flex flex-col">
+                <Card>
                   <CardHeader>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="w-full sm:max-w-md">
-                        <CardTitle>Courses</CardTitle>
-                        <CardDescription>Total student population per course</CardDescription>
-                        <div className="mt-3">
-                          <Input
-                            placeholder="Search courses..."
-                            value={courseSearchQuery}
-                            onChange={(e) => setCourseSearchQuery(e.target.value)}
-                            className="h-9"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    <CardTitle>Departments</CardTitle>
+                    <CardDescription>Use the sidebar child links to open the dedicated departments pages.</CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0">
-                    <div className="h-full space-y-4 overflow-y-auto pr-1">
-                      {loadingDepartments ? (
-                        Array.from({ length: 4 }).map((_, index) => (
-                          <div
-                            key={`department-skeleton-${index}`}
-                            className="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="flex items-center gap-3 sm:gap-4">
-                              <Skeleton className="h-12 w-12 rounded-lg" />
-                              <div className="space-y-2">
-                                <Skeleton className="h-4 w-36" />
-                                <Skeleton className="h-3 w-24" />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Skeleton className="h-6 w-16 rounded-full" />
-                              <Skeleton className="h-3 w-20" />
-                            </div>
-                          </div>
-                        ))
-                      ) : searchedCourses.map((dept) => (
-                        <div key={dept.id} className="flex flex-col gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-3 sm:gap-4">
-                            <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <Building2 className="h-6 w-6 text-blue-600" />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900">{dept.name}</h3>
-                            </div>
-                          </div>
-                          <div className="grid w-full grid-cols-1 gap-3 text-sm sm:w-auto">
-                            <div className="text-center">
-                              <p className="font-semibold text-slate-900">{dept.students}</p>
-                              <p className="text-slate-500">Total Students</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {!loadingDepartments && searchedCourses.length === 0 && (
-                        <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-                          No courses found for this search.
-                        </div>
-                      )}
-                    </div>
+                  <CardContent className="flex flex-wrap gap-2">
+                    <Button asChild>
+                      <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/admin/departments/courses-list"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Courses List</Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -3676,7 +3635,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                           <Button
                             type="button"
                             size="sm"
-                            className="bg-sky-100 text-sky-700 hover:bg-sky-200"
+                            className="bg-sky-600 text-white hover:bg-sky-700"
                             onClick={() => openScheduleModalForSelection("admission")}
                             disabled={selectedAdmissionIds.length === 0 || filteredPendingAdmissionsBySearch.length === 0}
                           >
@@ -3821,7 +3780,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                           <Button
                             type="button"
                             size="sm"
-                            className="bg-sky-100 text-sky-700 hover:bg-sky-200"
+                            className="bg-sky-600 text-white hover:bg-sky-700"
                             onClick={() => openScheduleModalForSelection("vocational")}
                             disabled={selectedVocationalIds.length === 0}
                           >
@@ -4307,12 +4266,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
             </button>
             <button
               type="button"
-              onClick={() => navigateToAdminTab("departments")}
-              className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium transition-colors ${
-                activeAdminTab === "departments"
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
-              }`}
+              onClick={() => router.push("/admin/departments")}
+              className="flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
             >
               <Building2 className="h-4 w-4" />
               Dept

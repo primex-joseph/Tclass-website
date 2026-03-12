@@ -44,3 +44,6 @@ next-env.d.ts
 /agents
 
 dist/
+
+# Runtime local data
+.data/

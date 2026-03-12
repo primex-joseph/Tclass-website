@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { VocationalPageSkeleton } from "@/components/ui/loading-states";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { submitAdmissionForm } from "@/lib/admission-submit";
+import { getPreferredSignatoryNameRemote, ORG_CHART_UPDATED_EVENT } from "@/lib/org-chart-signatories";
 import { useFieldCompletionFlash } from "@/lib/use-field-completion-flash";
 
 import { Badge } from "@/components/ui/badge";
@@ -832,6 +833,36 @@ function VocationalPageContent() {
     setForm((prev) => ({ ...prev, disabilityCauses: [] }));
   }, [form.disabilityTypes, form.disabilityCauses]);
 
+  const applyNotedByFromChart = useCallback(() => {
+    void (async () => {
+      const signatoryName = await getPreferredSignatoryNameRemote();
+      setForm((prev) => {
+        if (prev.notedByName === signatoryName) return prev;
+        return { ...prev, notedByName: signatoryName };
+      });
+    })();
+  }, []);
+
+  const resetFormToDefaults = useCallback(() => {
+    void (async () => {
+      const signatoryName = await getPreferredSignatoryNameRemote();
+      setForm({ ...defaultForm, notedByName: signatoryName });
+    })();
+  }, []);
+
+  useEffect(() => {
+    applyNotedByFromChart();
+    const handleOrgChartUpdate = () => applyNotedByFromChart();
+    const timer = window.setInterval(() => applyNotedByFromChart(), 10000);
+    window.addEventListener(ORG_CHART_UPDATED_EVENT, handleOrgChartUpdate);
+    window.addEventListener("storage", handleOrgChartUpdate);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(ORG_CHART_UPDATED_EVENT, handleOrgChartUpdate);
+      window.removeEventListener("storage", handleOrgChartUpdate);
+    };
+  }, [applyNotedByFromChart]);
+
   const toggleArrayValue = (
     key:
       | "civilStatus"
@@ -1037,6 +1068,7 @@ function VocationalPageContent() {
       const fullName = [form.firstName, form.middleName, form.lastName, form.extensionName]
         .filter((value) => value.trim().length > 0)
         .join(" ");
+      const resolvedNotedByName = (await getPreferredSignatoryNameRemote()) || form.notedByName;
 
       const response = await submitAdmissionForm({
         fullName,
@@ -1051,7 +1083,7 @@ function VocationalPageContent() {
         contactNo: form.contactNo.replace(/\D/g, "") || null,
         enrollmentPurposes: form.enrollmentPurposes,
         enrollmentPurposeOthers: form.enrollmentPurposeOthers || null,
-        formData: form,
+        formData: { ...form, notedByName: resolvedNotedByName },
         idPictureFile,
         oneByOnePictureFile,
         rightThumbmarkFile,
@@ -1061,7 +1093,7 @@ function VocationalPageContent() {
       });
 
       toast.success((response as { message?: string }).message ?? "Vocational enrollment submitted successfully.");
-      setForm(defaultForm);
+      resetFormToDefaults();
       setIdPictureFile(null);
       setOneByOnePictureFile(null);
       setRightThumbmarkFile(null);
@@ -1202,7 +1234,7 @@ function VocationalPageContent() {
   return (
     <main className="vocational-page min-h-screen bg-gradient-to-b from-blue-50 via-slate-50 to-white p-2.5 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6">
-        <div className="glass-panel sticky top-2 z-30 rounded-2xl p-4 sm:top-4 sm:p-5 md:p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="glass-panel sticky top-0 z-40 rounded-2xl border border-blue-100/80 bg-white/95 p-4 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-white/90 dark:border-white/10 dark:bg-slate-950/95 dark:supports-[backdrop-filter]:bg-slate-950/90 sm:p-5 md:p-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <Badge className="mb-2 bg-blue-100 text-blue-700 border border-blue-200">Vocational Enrollment</Badge>
             <h1 className="text-2xl sm:text-3xl font-semibold leading-tight text-blue-950">Learner&apos;s Profile Form</h1>
@@ -1856,7 +1888,8 @@ function VocationalPageContent() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Registrar/School Admin Name</Label>
-                  <Input value={form.notedByName} onChange={(e) => setForm((prev) => ({ ...prev, notedByName: e.target.value }))} />
+                  <Input value={form.notedByName} readOnly aria-readonly="true" />
+                  <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; School Organizational Chart signatory role.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Date Received</Label>
@@ -1910,7 +1943,7 @@ function VocationalPageContent() {
                 "Review and Submit"
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => setForm(defaultForm)} className="w-full sm:w-auto">
+            <Button type="button" variant="outline" onClick={resetFormToDefaults} className="w-full sm:w-auto">
               Reset
             </Button>
           </div>

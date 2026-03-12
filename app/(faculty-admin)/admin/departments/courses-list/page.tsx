@@ -3,25 +3,64 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { BarChart3, BookOpen, Building2, Calendar, CheckCircle, FileText, MessageSquare, School } from "lucide-react";
 
-import { EditableOrgChart } from "@/components/admin/editable-org-chart";
+import { apiFetch } from "@/lib/api-client";
 import { GlobalSearchInput } from "@/components/shared/global-search-input";
 import { PortalHeader, PortalSidebar } from "@/components/shared/portal-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function AdminDepartmentsPage() {
+type Department = {
+  id: number;
+  name: string;
+  head: string;
+  faculty: number;
+  students: number;
+  classes: number;
+};
+
+export default function AdminDepartmentCoursesPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [now, setNow] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await apiFetch("/admin/departments-overview");
+      const rows = (response as { departments?: Department[] }).departments ?? [];
+      setDepartments(rows);
+    } catch (error) {
+      setDepartments([]);
+      toast.error(error instanceof Error ? error.message : "Failed to load departments.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDepartments();
+  }, [loadDepartments]);
+
+  const filteredDepartments = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return departments;
+    return departments.filter((dept) => `${dept.name} ${dept.head} ${dept.students}`.toLowerCase().includes(q));
+  }, [departments, searchQuery]);
 
   const handleLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
@@ -65,12 +104,12 @@ export default function AdminDepartmentsPage() {
               <Link href="/admin/programs" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><BookOpen className="h-4 w-4" />Programs</Link>
               <Link href="/admin/departments" className="flex w-full items-center gap-3 rounded-xl bg-blue-600 px-3 py-2.5 text-left text-sm font-medium text-white"><Building2 className="h-4 w-4" />Departments</Link>
               <div className="pl-9">
-                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/15" asChild>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
                   <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
                 </Button>
               </div>
               <div className="pl-9">
-                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/15" asChild>
                   <Link href="/admin/departments/courses-list"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Courses List</Link>
                 </Button>
               </div>
@@ -90,7 +129,7 @@ export default function AdminDepartmentsPage() {
                 <span className="-ml-4 hidden text-base font-bold text-slate-900 dark:text-slate-100 md:block">Tarlac Center for Learning and Skills Success</span>
               </div>
               <div className="flex flex-1 items-center justify-end gap-2 xl:gap-3">
-                <GlobalSearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search departments..." className="hidden lg:block lg:w-48 xl:w-56 2xl:w-64" />
+                <GlobalSearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search courses..." className="hidden lg:block lg:w-48 xl:w-56 2xl:w-64" />
                 <button type="button" className="hidden rounded-full border border-transparent p-2 text-slate-600 hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-white/15 dark:hover:bg-white/10 sm:inline-flex">
                   <MessageSquare className="h-5 w-5" />
                 </button>
@@ -108,9 +147,62 @@ export default function AdminDepartmentsPage() {
           <div className="w-full space-y-6 px-4 py-6 sm:px-6 sm:py-8">
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">Departments Management</h1>
-              <p className="mt-1 text-slate-600 dark:text-slate-400">School Organizational Chart</p>
+              <p className="mt-1 text-slate-600 dark:text-slate-400">Courses List</p>
             </div>
-            <EditableOrgChart />
+
+            <Card className="border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/60">
+              <CardHeader>
+                <CardTitle>Courses</CardTitle>
+                <CardDescription>Total student population per course</CardDescription>
+                <div className="pt-2 sm:max-w-md">
+                  <Input placeholder="Search courses..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="h-9" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {loading ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div key={`department-skeleton-${index}`} className="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <Skeleton className="h-12 w-12 rounded-lg" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-36" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-6 w-16 rounded-full" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                    ))
+                  ) : filteredDepartments.map((dept) => (
+                    <div key={dept.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between sm:p-4 dark:border-white/10 dark:hover:bg-white/5">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-500/10">
+                          <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100">{dept.name}</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Head: {dept.head || "-"}</p>
+                        </div>
+                      </div>
+                      <div className="grid w-full grid-cols-1 gap-3 text-sm sm:w-auto">
+                        <div className="text-center">
+                          <p className="font-semibold text-slate-900 dark:text-slate-100">{dept.students}</p>
+                          <p className="text-slate-500 dark:text-slate-400">Total Students</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {!loading && filteredDepartments.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500 dark:border-white/15 dark:text-slate-400">
+                      No courses found for this search.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>

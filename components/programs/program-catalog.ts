@@ -29,6 +29,9 @@ export type ProgramCatalogItem = {
   sort_order: number;
   is_limited_slots: boolean;
   is_active: boolean;
+  slots_limit?: number | null;
+  enrolled_count?: number;
+  slots_left?: number;
 };
 
 export type ProgramCatalogTab = {
