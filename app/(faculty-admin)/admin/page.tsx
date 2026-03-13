@@ -83,7 +83,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
+<<<<<<< HEAD
 import { clearPortalSessionUserCache, usePortalSessionUser } from "@/lib/portal-session-user";
+=======
+import { AdminCsvImportTrigger } from "@/components/admin/csv-import-trigger";
+import { AdminCsvGeneratorTrigger } from "@/components/admin/csv-generator-trigger";
+>>>>>>> pr-2
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { LogoutModal } from "@/components/ui/logout-modal";
 
@@ -1341,7 +1346,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const latestConversationThreads = conversationThreads.slice(0, 3);
 
   const handleNavClick = (section: string) => {
-    toast(`Navigating to ${section}...`, { icon: "ðŸ”—" });
+    toast(`Navigating to ${section}...`, { icon: "🔗" });
   };
   const navigateToAdminTab = (tab: AdminSectionTab) => {
     setActiveAdminTab(tab);
@@ -2851,7 +2856,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
           </nav>
 
           <div className="border-t border-slate-200/80 px-4 py-3 dark:border-white/10">
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright · v1.0.0</p>
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">@2026 Copyright - v1.0.0</p>
           </div>
         </div>
       </PortalSidebar>
@@ -2893,6 +2898,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 placeholder={headerSearchPlaceholder}
                 className="hidden lg:block lg:w-48 xl:w-56 2xl:w-64"
               />
+              <AdminCsvImportTrigger className="h-9 rounded-xl border-slate-200 bg-white/95 text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10" />
+              <AdminCsvGeneratorTrigger className="h-9 rounded-xl border-slate-200 bg-white/95 text-slate-700 hover:bg-slate-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10" />
               {!mobileMenuOpen && (
                 <Button
                   variant="ghost"
@@ -3438,7 +3445,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                             >
                               <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.full_name}</p>
                               <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {(item.application_type ?? "admission") === "vocational" ? "Vocational" : "Admission"} â€¢ {item.primary_course}
+                                {(item.application_type ?? "admission") === "vocational" ? "Vocational" : "Admission"} • {item.primary_course}
                               </p>
                             </button>
                           );
@@ -4809,7 +4816,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                     }}
                     className="w-full py-1.5 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                   >
-                    View all messages from {activeMessagePreview.full_name.split(" ")[0]} â†’
+                    View all messages from {activeMessagePreview.full_name.split(" ")[0]} →
                   </button>
                 )}
               </div>
