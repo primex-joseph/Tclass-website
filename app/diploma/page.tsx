@@ -1794,7 +1794,7 @@ function VocationalPageContent() {
                   aria-readonly="true"
                   placeholder="Not set in Organizational Chart"
                 />
-                <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; School Organizational Chart signatory role.</p>
+                <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; Organizational Chart signatory role.</p>
               </div>
               <div className="space-y-2" data-field="dateReceived">
                 <Label>Date Received</Label>
@@ -1979,6 +1979,7 @@ export default function VocationalPage() {
     </Suspense>
   );
 }
+
 
 
 

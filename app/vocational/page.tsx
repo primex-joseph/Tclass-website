@@ -1889,7 +1889,7 @@ function VocationalPageContent() {
                 <div className="space-y-2">
                   <Label>Registrar/School Admin Name</Label>
                   <Input value={form.notedByName} readOnly aria-readonly="true" />
-                  <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; School Organizational Chart signatory role.</p>
+                  <p className="text-xs text-slate-500">Auto-fetched from Departments -&gt; Organizational Chart signatory role.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Date Received</Label>
@@ -2070,6 +2070,7 @@ export default function VocationalPage() {
     </Suspense>
   );
 }
+
 
 
 

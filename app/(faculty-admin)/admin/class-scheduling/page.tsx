@@ -29,6 +29,7 @@ import { GlobalSearchInput } from "@/components/shared/global-search-input";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { clearPortalSessionUserCache, usePortalSessionUser } from "@/lib/portal-session-user";
 
 type Period = { id: number; name: string; is_active: number };
 type Teacher = { id: number; full_name: string };
@@ -82,6 +83,23 @@ type PlannedSchedule = {
 };
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+type SchedulingMastersPayload = {
+  periods: Period[];
+  teachers: Teacher[];
+  rooms: Room[];
+  sections: Section[];
+  courses: Course[];
+};
+
+const classSchedulingCache: {
+  masters: SchedulingMastersPayload | null;
+  offeringsByKey: Map<string, ScheduleItem[]>;
+  conflictPoolByPeriod: Map<string, ScheduleItem[]>;
+} = {
+  masters: null,
+  offeringsByKey: new Map<string, ScheduleItem[]>(),
+  conflictPoolByPeriod: new Map<string, ScheduleItem[]>(),
+};
 
 const toProgramLabel = (programKey: string) => {
   const key = (programKey ?? "").trim().toUpperCase();
@@ -149,8 +167,14 @@ const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) =>
   return as < be && ae > bs;
 };
 
+const makeOfferingsCacheKey = (params: { period: string; section: string; search: string }) => {
+  const normalizedSearch = params.search.trim().toLowerCase();
+  return `period=${params.period}|section=${params.section}|search=${normalizedSearch}`;
+};
+
 export default function AdminClassSchedulingPage() {
   const router = useRouter();
+  const { sessionUser } = usePortalSessionUser();
 
   const [periods, setPeriods] = useState<Period[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -172,6 +196,15 @@ export default function AdminClassSchedulingPage() {
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [now, setNow] = useState<Date | null>(null);
   const [periodOfferings, setPeriodOfferings] = useState<ScheduleItem[]>([]);
+  const sessionName = sessionUser?.name?.trim() || "Account";
+  const sessionEmail = sessionUser?.email?.trim() || "";
+  const sessionInitials = sessionName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "AD";
 
   useEffect(() => {
     setNow(new Date());
@@ -260,6 +293,16 @@ export default function AdminClassSchedulingPage() {
   }, [pastAyPeriods, pastPeriodFilter, viewPastRecords]);
 
   const loadMasters = useCallback(async () => {
+    if (classSchedulingCache.masters) {
+      const cached = classSchedulingCache.masters;
+      setPeriods(cached.periods);
+      setTeachers(cached.teachers);
+      setRooms(cached.rooms);
+      setSections(cached.sections);
+      setCourses(cached.courses);
+      return;
+    }
+
     const res = await apiFetch("/admin/scheduling/masters");
     const payload = res as {
       periods?: Period[];
@@ -268,14 +311,43 @@ export default function AdminClassSchedulingPage() {
       sections?: Section[];
       courses?: Course[];
     };
-    setPeriods(payload.periods ?? []);
-    setTeachers(payload.teachers ?? []);
-    setRooms(payload.rooms ?? []);
-    setSections(payload.sections ?? []);
-    setCourses(payload.courses ?? []);
+    const next = {
+      periods: payload.periods ?? [],
+      teachers: payload.teachers ?? [],
+      rooms: payload.rooms ?? [],
+      sections: payload.sections ?? [],
+      courses: payload.courses ?? [],
+    };
+    classSchedulingCache.masters = next;
+    setPeriods(next.periods);
+    setTeachers(next.teachers);
+    setRooms(next.rooms);
+    setSections(next.sections);
+    setCourses(next.courses);
   }, []);
 
   const loadItems = useCallback(async () => {
+    if (!viewPastRecords && periodFilter === "all" && activePeriod) {
+      return;
+    }
+
+    const cacheKey = makeOfferingsCacheKey({
+      period: effectivePeriodFilter || "all",
+      section: sectionFilter,
+      search: searchQuery,
+    });
+    const cachedItems = classSchedulingCache.offeringsByKey.get(cacheKey);
+    if (cachedItems) {
+      setRows(cachedItems);
+      setEdits(
+        cachedItems.reduce<Record<string, RowEdit>>((acc, item) => {
+          acc[getRowKey(item)] = emptyEdit();
+          return acc;
+        }, {})
+      );
+      return;
+    }
+
     const qs = new URLSearchParams();
     if (effectivePeriodFilter && effectivePeriodFilter !== "all") qs.set("period_id", effectivePeriodFilter);
     if (sectionFilter !== "all") qs.set("section_id", sectionFilter);
@@ -284,6 +356,7 @@ export default function AdminClassSchedulingPage() {
     const res = await apiFetch(`/admin/scheduling/offerings${qs.size ? `?${qs.toString()}` : ""}`);
     const payload = res as { items?: ScheduleItem[] };
     const items = payload.items ?? [];
+    classSchedulingCache.offeringsByKey.set(cacheKey, items);
     setRows(items);
     setEdits(
       items.reduce<Record<string, RowEdit>>((acc, item) => {
@@ -291,7 +364,7 @@ export default function AdminClassSchedulingPage() {
         return acc;
       }, {})
     );
-  }, [effectivePeriodFilter, searchQuery, sectionFilter]);
+  }, [activePeriod, effectivePeriodFilter, periodFilter, searchQuery, sectionFilter, viewPastRecords]);
 
   const loadConflictPool = useCallback(async () => {
     if (!effectivePeriodFilter || effectivePeriodFilter === "all") {
@@ -299,29 +372,43 @@ export default function AdminClassSchedulingPage() {
       return;
     }
 
+    const cached = classSchedulingCache.conflictPoolByPeriod.get(effectivePeriodFilter);
+    if (cached) {
+      setPeriodOfferings(cached);
+      return;
+    }
+
     try {
       const res = await apiFetch(`/admin/scheduling/offerings?period_id=${effectivePeriodFilter}`);
       const payload = res as { items?: ScheduleItem[] };
-      setPeriodOfferings(payload.items ?? []);
+      const items = payload.items ?? [];
+      classSchedulingCache.conflictPoolByPeriod.set(effectivePeriodFilter, items);
+      setPeriodOfferings(items);
     } catch {
       setPeriodOfferings([]);
     }
   }, [effectivePeriodFilter]);
 
-  const loadAll = useCallback(async () => {
-    try {
-      setLoading(true);
-      await Promise.all([loadMasters(), loadItems()]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load class scheduling data.");
-    } finally {
-      setLoading(false);
-    }
-  }, [loadItems, loadMasters]);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    void loadMasters()
+      .catch((error) => {
+        if (!alive) return;
+        toast.error(error instanceof Error ? error.message : "Failed to load class scheduling data.");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [loadMasters]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (periods.length === 0) return;
+    void loadItems();
+  }, [loadItems, periods.length]);
 
   useEffect(() => {
     void loadConflictPool();
@@ -555,6 +642,8 @@ export default function AdminClassSchedulingPage() {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      classSchedulingCache.offeringsByKey.clear();
+      classSchedulingCache.conflictPoolByPeriod.delete(String(payload.period_id));
       await loadItems();
       await loadConflictPool();
       setEdits((prev) => ({
@@ -598,6 +687,10 @@ export default function AdminClassSchedulingPage() {
         method: "POST",
         body: JSON.stringify({ items: payloadItems }),
       });
+      classSchedulingCache.offeringsByKey.clear();
+      if (effectivePeriodFilter && effectivePeriodFilter !== "all") {
+        classSchedulingCache.conflictPoolByPeriod.delete(effectivePeriodFilter);
+      }
       await loadItems();
       await loadConflictPool();
       setEdits((prev) => {
@@ -635,7 +728,12 @@ export default function AdminClassSchedulingPage() {
         setPeriodFilter(String(nextId));
         setViewPastRecords(false);
       }
-      await loadAll();
+      classSchedulingCache.masters = null;
+      classSchedulingCache.offeringsByKey.clear();
+      classSchedulingCache.conflictPoolByPeriod.clear();
+      await loadMasters();
+      await loadItems();
+      await loadConflictPool();
       toast.success(payload.message ?? "Enrollment period updated.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to advance period.");
@@ -708,6 +806,7 @@ export default function AdminClassSchedulingPage() {
   const handleLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
+    clearPortalSessionUserCache();
     router.push("/");
     router.refresh();
   };
@@ -732,11 +831,11 @@ export default function AdminClassSchedulingPage() {
           <div className="border-b border-slate-200/80 px-4 py-5 dark:border-white/10">
             <div className="flex flex-col items-center gap-3 text-center">
               <Avatar className="h-20 w-20 ring-4 ring-blue-100 ring-offset-2 shadow-lg dark:ring-blue-900/50 dark:ring-offset-slate-900">
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">AD</AvatarFallback>
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">{sessionInitials}</AvatarFallback>
               </Avatar>
               <div className="space-y-1">
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Administrator</p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">admin@tclass.local</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{sessionName}</p>
+                {sessionEmail ? <p className="text-xs text-blue-600 dark:text-blue-400">{sessionEmail}</p> : null}
                 <p className="text-xs text-slate-500 dark:text-slate-400">System Management</p>
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Admin Portal</span>
               </div>
@@ -757,7 +856,7 @@ export default function AdminClassSchedulingPage() {
               <Link href="/admin/departments" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><Building2 className="h-4 w-4" />Departments</Link>
               <div className="pl-9">
                 <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
-                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>
                 </Button>
               </div>
               <div className="pl-9">
@@ -793,7 +892,7 @@ export default function AdminClassSchedulingPage() {
                   <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{now ? now.toLocaleTimeString() : "--:--:--"}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{now ? now.toLocaleDateString() : "---"}</p>
                 </div>
-                <AvatarActionsMenu initials="AD" onLogout={handleLogout} name="Administrator" subtitle="admin@tclass.local" triggerName="Administrator" triggerSubtitle="admin@tclass.local" triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10" fallbackClassName="bg-blue-600 text-white" />
+                <AvatarActionsMenu initials={sessionInitials} onLogout={handleLogout} name={sessionName} subtitle={sessionEmail} triggerName={sessionName} triggerSubtitle={sessionEmail} triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10" fallbackClassName="bg-blue-600 text-white" />
               </div>
             </div>
           </div>
@@ -966,7 +1065,7 @@ export default function AdminClassSchedulingPage() {
                         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{row.course_code} - {row.course_title}</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-300">{row.units} unit(s) • {row.enrolled_count}/{row.capacity} enrolled • {row.slots_left} slot(s) left</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300">{row.units} unit(s) â€¢ {row.enrolled_count}/{row.capacity} enrolled â€¢ {row.slots_left} slot(s) left</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">{row.id ? `Offering #${row.id}` : "Not yet scheduled"}</Badge>
@@ -1027,3 +1126,4 @@ export default function AdminClassSchedulingPage() {
     </div>
   );
 }
+

@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GlobalSearchInput } from "@/components/shared/global-search-input";
+import { clearPortalSessionUserCache, usePortalSessionUser } from "@/lib/portal-session-user";
 
 type CurriculumVersion = {
   id: number;
@@ -149,6 +150,7 @@ const BSIT_TESDA_CURRICULUM_PRESET: SubjectPresetRow[] = [
 function AdminCurriculumPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { sessionUser } = usePortalSessionUser();
   const isCurriculumListView = searchParams.get("child") === "list";
   const [now, setNow] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -169,6 +171,15 @@ function AdminCurriculumPageContent() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activatingId, setActivatingId] = useState<number | null>(null);
+  const sessionName = sessionUser?.name?.trim() || "Account";
+  const sessionEmail = sessionUser?.email?.trim() || "";
+  const sessionInitials = sessionName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "AD";
 
   useEffect(() => {
     setNow(new Date());
@@ -203,6 +214,7 @@ function AdminCurriculumPageContent() {
   const handleLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
+    clearPortalSessionUserCache();
     router.push("/");
     router.refresh();
   };
@@ -325,10 +337,10 @@ function AdminCurriculumPageContent() {
         <div className="flex h-full flex-col">
           <div className="border-b border-slate-200/80 px-4 py-5 dark:border-white/10">
             <div className="flex flex-col items-center gap-3 text-center">
-              <Avatar className="h-20 w-20 ring-4 ring-blue-100 ring-offset-2 shadow-lg dark:ring-blue-900/50 dark:ring-offset-slate-900"><AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">AD</AvatarFallback></Avatar>
+              <Avatar className="h-20 w-20 ring-4 ring-blue-100 ring-offset-2 shadow-lg dark:ring-blue-900/50 dark:ring-offset-slate-900"><AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">{sessionInitials}</AvatarFallback></Avatar>
               <div className="space-y-1">
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Administrator</p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">admin@tclass.local</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{sessionName}</p>
+                {sessionEmail ? <p className="text-xs text-blue-600 dark:text-blue-400">{sessionEmail}</p> : null}
                 <p className="text-xs text-slate-500 dark:text-slate-400">System Management</p>
               </div>
             </div>
@@ -360,7 +372,7 @@ function AdminCurriculumPageContent() {
               <Link href="/admin/departments" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><Building2 className="h-4 w-4" />Departments</Link>
               <div className="pl-9">
                 <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
-                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>
                 </Button>
               </div>
               <div className="pl-9">
@@ -372,7 +384,7 @@ function AdminCurriculumPageContent() {
               <Link href="/admin/vocationals" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><BarChart3 className="h-4 w-4" />Vocationals</Link>
             </div>
           </nav>
-          <div className="border-t border-slate-200/80 px-4 py-3 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">@2026 Copyright · v1.0.0</div>
+          <div className="border-t border-slate-200/80 px-4 py-3 text-center text-xs text-slate-500 dark:border-white/10 dark:text-slate-400">@2026 Copyright Â· v1.0.0</div>
         </div>
       </aside>
 
@@ -392,7 +404,7 @@ function AdminCurriculumPageContent() {
               />
               <Button type="button" variant="ghost" size="icon" className="hidden sm:inline-flex"><MessageSquare className="h-5 w-5" /></Button>
               <div className="hidden text-right sm:block"><p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{now ? now.toLocaleTimeString() : "--:--:--"}</p><p className="text-xs text-slate-500 dark:text-slate-400">{now ? now.toLocaleDateString() : "---"}</p></div>
-              <AvatarActionsMenu initials="AD" onLogout={handleLogout} name="Administrator" subtitle="admin@tclass.local" triggerName="Administrator" triggerSubtitle="admin@tclass.local" triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10" fallbackClassName="bg-blue-600 text-white" />
+              <AvatarActionsMenu initials={sessionInitials} onLogout={handleLogout} name={sessionName} subtitle={sessionEmail} triggerName={sessionName} triggerSubtitle={sessionEmail} triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10" fallbackClassName="bg-blue-600 text-white" />
             </div>
           </div></div>
         </header>
@@ -515,8 +527,8 @@ function AdminCurriculumPageContent() {
                       <div key={c.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-slate-950/40 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-slate-100">{c.label}</p>
-                          <p className="text-sm text-slate-700 dark:text-slate-300">{c.program_name} · AY {c.effective_ay ?? "-"} · {c.version} · {c.subject_count} subjects</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{c.source_file_name ?? "No PDF"} · {new Date(c.updated_at).toLocaleString()}</p>
+                          <p className="text-sm text-slate-700 dark:text-slate-300">{c.program_name} Â· AY {c.effective_ay ?? "-"} Â· {c.version} Â· {c.subject_count} subjects</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{c.source_file_name ?? "No PDF"} Â· {new Date(c.updated_at).toLocaleString()}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge className={c.is_active ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300" : "border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"}>{c.is_active ? "active" : "draft"}</Badge>
@@ -541,7 +553,7 @@ function AdminCurriculumPageContent() {
               <DialogHeader>
                 <DialogTitle>{viewingCurriculum?.label ?? "Curriculum"} - Subjects</DialogTitle>
                 <DialogDescription>
-                  {viewingCurriculum ? `${viewingCurriculum.program_name} · AY ${viewingCurriculum.effective_ay ?? "-"} · ${viewingCurriculum.version}` : "Curriculum subjects"}
+                  {viewingCurriculum ? `${viewingCurriculum.program_name} Â· AY ${viewingCurriculum.effective_ay ?? "-"} Â· ${viewingCurriculum.version}` : "Curriculum subjects"}
                 </DialogDescription>
               </DialogHeader>
               {viewLoading ? (
@@ -601,4 +613,5 @@ export default function AdminCurriculumPage() {
     </Suspense>
   );
 }
+
 

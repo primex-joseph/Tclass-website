@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense } from "react";
 import Image from "next/image";
@@ -78,11 +78,12 @@ import {
   FileText,
   Printer
 } from "lucide-react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ChangeEvent, type UIEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
+import { clearPortalSessionUserCache, usePortalSessionUser } from "@/lib/portal-session-user";
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { LogoutModal } from "@/components/ui/logout-modal";
 
@@ -106,12 +107,16 @@ interface BackendUserItem {
   student_number?: string | null;
   created_at?: string;
 }
-
-interface AuthSessionUser {
-  id: number;
-  name: string;
-  email: string;
-  role?: string | null;
+interface AdminStudentListItem {
+  id?: number;
+  first_name?: string | null;
+  last_name?: string | null;
+  name?: string | null;
+  email?: string | null;
+  course?: string | null;
+  year_level?: string | null;
+  gender?: string | null;
+  student_number?: string | null;
 }
 
 interface Department {
@@ -177,6 +182,16 @@ interface AdmissionApplication {
   } | null;
   form_data?: Record<string, unknown> | null;
 }
+interface StudentListRow {
+  id: number | string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  course: string;
+  year_level: string;
+  gender: string;
+  student_number: string;
+}
 
 function AdminDashboardContent() {
   return <AdminDashboardPage initialAdminTab="users" />;
@@ -231,6 +246,7 @@ interface VocationalTrend {
 
 type AdminSectionTab =
   | "users"
+  | "student-list"
   | "reports"
   | "departments"
   | "admissions"
@@ -248,6 +264,7 @@ const BATCH_LABELS = ["Batch A", "Batch B", "Batch C", "Batch D"];
 const DEFAULT_ADMIN_TAB: AdminSectionTab = "users";
 const ADMIN_TABS: AdminSectionTab[] = [
   "users",
+  "student-list",
   "reports",
   "departments",
   "admissions",
@@ -507,6 +524,40 @@ const isAdminTab = (value: string | null | undefined): value is AdminSectionTab 
 
 const getAdminTabHref = (tab: AdminSectionTab) =>
   tab === DEFAULT_ADMIN_TAB ? "/admin" : `/admin?tab=${tab}`;
+const STUDENT_LIST_CSV_HEADERS = ["first_name", "last_name", "email", "course", "year_level", "gender", "student_number"] as const;
+const escapeCsvCell = (value: string) => {
+  const text = String(value ?? "");
+  if (text.includes(",") || text.includes("\"") || text.includes("\n")) {
+    return `"${text.replace(/"/g, "\"\"")}"`;
+  }
+  return text;
+};
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+    if (char === "\"" && inQuotes && nextChar === "\"") {
+      current += "\"";
+      i += 1;
+      continue;
+    }
+    if (char === "\"") {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  values.push(current.trim());
+  return values;
+};
 
 function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) {
   const router = useRouter();
@@ -532,12 +583,18 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     faculty: false,
     admin: false,
   });
+  const studentDirectoryLoadedRef = useRef(false);
+  const studentDirectoryLoadingRef = useRef(false);
+  const studentListImportInputRef = useRef<HTMLInputElement | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<"student" | "faculty" | "admin">("admin");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [universalSearchQuery, setUniversalSearchQuery] = useState("");
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [studentListSearchQuery, setStudentListSearchQuery] = useState("");
+  const [studentListCourseFilter, setStudentListCourseFilter] = useState("all");
+  const [studentListYearFilter, setStudentListYearFilter] = useState("all");
   const [courseSearchQuery, setCourseSearchQuery] = useState("");
   const [admissionSearchQuery, setAdmissionSearchQuery] = useState("");
   const [vocationalSearchQuery, setVocationalSearchQuery] = useState("");
@@ -569,7 +626,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   
   // Data states
   const [users, setUsers] = useState<UserItem[]>([]);
-  const [sessionUser, setSessionUser] = useState<AuthSessionUser | null>(null);
+  const { sessionUser, sessionResolved } = usePortalSessionUser();
   
   const [departments, setDepartments] = useState<Department[]>([]);
   
@@ -591,6 +648,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [admissions, setAdmissions] = useState<AdmissionApplication[]>([]);
+  const [importedStudentRows, setImportedStudentRows] = useState<StudentListRow[]>([]);
+  const [studentDirectoryRows, setStudentDirectoryRows] = useState<StudentListRow[]>([]);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     students: 0,
     faculty: 0,
@@ -880,30 +939,39 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     }
   };
 
-  useEffect(() => {
-    let alive = true;
-    apiFetch("/auth/me")
-      .then((response) => {
-        if (!alive) return;
-        const payload = response as { user?: { id?: number; name?: string; email?: string; role?: string | null } };
-        const user = payload.user;
-        if (!user?.id || !user?.email) return;
-        setSessionUser({
-          id: Number(user.id),
-          name: user.name ?? "Administrator",
-          email: user.email,
-          role: user.role ?? null,
-        });
-      })
-      .catch(() => {
-        if (!alive) return;
-        setSessionUser(null);
-      });
+  const loadStudentDirectory = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (studentDirectoryLoadingRef.current) return;
+      if (!force && studentDirectoryLoadedRef.current) return;
 
-    return () => {
-      alive = false;
-    };
-  }, []);
+      studentDirectoryLoadingRef.current = true;
+      try {
+        const response = (await apiFetch("/admin/students")) as { students?: AdminStudentListItem[] };
+        const rows = (response.students ?? []).map((row, index) => {
+          const firstName = sanitizeText(row.first_name, "");
+          const lastName = sanitizeText(row.last_name, "");
+          const fallbackNameParts = splitFullName(String(row.name ?? ""));
+          return {
+            id: row.id ?? `student-row-${index}`,
+            first_name: firstName || sanitizeText(fallbackNameParts.firstName, "N/A"),
+            last_name: lastName || sanitizeText(fallbackNameParts.lastName, "N/A"),
+            email: sanitizeText(row.email, "N/A"),
+            course: sanitizeText(row.course, "N/A"),
+            year_level: sanitizeText(row.year_level, "N/A"),
+            gender: sanitizeText(row.gender, "N/A"),
+            student_number: sanitizeText(row.student_number, "N/A"),
+          };
+        });
+        setStudentDirectoryRows(rows);
+        studentDirectoryLoadedRef.current = true;
+      } catch {
+        setStudentDirectoryRows([]);
+      } finally {
+        studentDirectoryLoadingRef.current = false;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadDashboardStats();
@@ -922,6 +990,13 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     }
     void loadDepartmentsOverview();
   }, [activeAdminTab, loadDepartmentsOverview]);
+
+  useEffect(() => {
+    if (activeAdminTab !== "student-list") {
+      return;
+    }
+    void loadStudentDirectory();
+  }, [activeAdminTab, loadStudentDirectory]);
 
   const stats = {
     totalStudents: dashboardStats.students,
@@ -942,6 +1017,130 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
       ),
     [users, deferredSearchQuery]
   );
+  const studentListRows = useMemo<StudentListRow[]>(() => {
+    return [...studentDirectoryRows, ...importedStudentRows];
+  }, [importedStudentRows, studentDirectoryRows]);
+  const studentListCourseOptions = useMemo(
+    () =>
+      Array.from(new Set(studentListRows.map((row) => row.course).filter((value) => value && value !== "N/A"))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [studentListRows],
+  );
+  const studentListYearOptions = useMemo(
+    () =>
+      Array.from(new Set(studentListRows.map((row) => row.year_level).filter((value) => value && value !== "N/A"))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [studentListRows],
+  );
+  const studentListSearchTerm = studentListSearchQuery.trim().toLowerCase();
+  const filteredStudentListRows = useMemo(
+    () =>
+      studentListRows.filter((row) => {
+        const matchesCourse = studentListCourseFilter === "all" || row.course === studentListCourseFilter;
+        const matchesYear = studentListYearFilter === "all" || row.year_level === studentListYearFilter;
+        if (!matchesCourse || !matchesYear) return false;
+        if (!studentListSearchTerm) return true;
+        return [
+          row.first_name,
+          row.last_name,
+          row.email,
+          row.course,
+          row.year_level,
+          row.gender,
+          row.student_number,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(studentListSearchTerm);
+      }),
+    [studentListCourseFilter, studentListRows, studentListSearchTerm, studentListYearFilter],
+  );
+  const handleExportStudentListCsv = () => {
+    if (filteredStudentListRows.length === 0) {
+      toast.error("No student rows to export.");
+      return;
+    }
+    const csvLines = [
+      STUDENT_LIST_CSV_HEADERS.join(","),
+      ...filteredStudentListRows.map((row) =>
+        [
+          row.first_name,
+          row.last_name,
+          row.email,
+          row.course,
+          row.year_level,
+          row.gender,
+          row.student_number,
+        ]
+          .map(escapeCsvCell)
+          .join(","),
+      ),
+    ];
+    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `student-list-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Student list exported.");
+  };
+  const handleImportStudentListCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (lines.length < 2) {
+        toast.error("CSV file has no data rows.");
+        return;
+      }
+      const headers = parseCsvLine(lines[0]).map((header) => header.toLowerCase());
+      const hasAllHeaders = STUDENT_LIST_CSV_HEADERS.every((header) => headers.includes(header));
+      if (!hasAllHeaders) {
+        toast.error("Invalid CSV headers. Required: first_name,last_name,email,course,year_level,gender,student_number");
+        return;
+      }
+      const indexOf = (header: (typeof STUDENT_LIST_CSV_HEADERS)[number]) => headers.indexOf(header);
+      const importedRows: StudentListRow[] = [];
+      lines.slice(1).forEach((line, index) => {
+        const cols = parseCsvLine(line);
+        const first_name = cols[indexOf("first_name")]?.trim() || "";
+        const last_name = cols[indexOf("last_name")]?.trim() || "";
+        const email = cols[indexOf("email")]?.trim() || "";
+        const course = cols[indexOf("course")]?.trim() || "";
+        const year_level = cols[indexOf("year_level")]?.trim() || "";
+        const gender = cols[indexOf("gender")]?.trim() || "";
+        const student_number = cols[indexOf("student_number")]?.trim() || "";
+        if (!first_name && !last_name && !email) return;
+        importedRows.push({
+          id: `imported-${Date.now()}-${index}`,
+          first_name: first_name || "N/A",
+          last_name: last_name || "N/A",
+          email: email || "N/A",
+          course: course || "N/A",
+          year_level: year_level || "N/A",
+          gender: gender || "N/A",
+          student_number: student_number || "N/A",
+        });
+      });
+      if (importedRows.length === 0) {
+        toast.error("No valid rows found in CSV.");
+        return;
+      }
+      setImportedStudentRows((prev) => [...prev, ...importedRows]);
+      toast.success(`Imported ${importedRows.length} student row(s).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to import CSV.");
+    } finally {
+      event.target.value = "";
+    }
+  };
   const visibleUsers = filteredUsers.slice(0, visibleAccountsCount);
   const hasMoreUsers = visibleAccountsCount < filteredUsers.length;
 
@@ -1155,6 +1354,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const headerSearchQuery =
     activeAdminTab === "users"
       ? searchQuery
+      : activeAdminTab === "student-list"
+      ? studentListSearchQuery
       : activeAdminTab === "departments"
       ? courseSearchQuery
       : activeAdminTab === "admissions"
@@ -1167,6 +1368,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const headerSearchPlaceholder =
     activeAdminTab === "users"
       ? "Search users..."
+      : activeAdminTab === "student-list"
+      ? "Search students..."
       : activeAdminTab === "departments"
       ? "Search courses..."
       : activeAdminTab === "admissions"
@@ -1179,6 +1382,10 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const setHeaderSearchQuery = (value: string) => {
     if (activeAdminTab === "users") {
       setSearchQuery(value);
+      return;
+    }
+    if (activeAdminTab === "student-list") {
+      setStudentListSearchQuery(value);
       return;
     }
     if (activeAdminTab === "departments") {
@@ -1207,6 +1414,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const confirmLogout = () => {
     document.cookie = "tclass_token=; path=/; max-age=0; samesite=lax";
     document.cookie = "tclass_role=; path=/; max-age=0; samesite=lax";
+    clearPortalSessionUserCache();
     router.push("/");
     router.refresh();
   };
@@ -1243,7 +1451,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
       return selected.some((value) => normalizeOption(value) === target);
     };
     const checkbox = (checked: boolean, label: string) =>
-      `<div class="check-item"><span class="cb">${checked ? "☑" : "☐"}</span><span>${escapeHtml(label)}</span></div>`;
+      `<div class="check-item"><span class="cb">${checked ? "?" : "?"}</span><span>${escapeHtml(label)}</span></div>`;
 
     const uliNumber = getValue(["uliNumber", "uli_number"]);
     const entryDate = getValue(["entryDate", "entry_date"]);
@@ -2434,10 +2642,11 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     }
   };
 
-  const sessionName = sessionUser?.name?.trim() || "Administrator";
-  const sessionEmail = sessionUser?.email?.trim() || "admin@tclass.local";
+  const sessionName = sessionUser?.name?.trim() || "Account";
+  const sessionEmail = sessionUser?.email?.trim() || "";
   const sessionRole = (sessionUser?.role ?? "admin").toLowerCase();
   const sessionRoleLabel = sessionRole === "faculty" ? "Faculty Portal" : sessionRole === "student" ? "Student Portal" : "Admin Portal";
+  const showSessionSkeleton = !sessionResolved;
   const sessionInitials = sessionName
     .split(" ")
     .filter(Boolean)
@@ -2452,19 +2661,33 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
         <div className="flex h-full flex-col">
           <div className="border-b border-slate-200/80 px-4 py-5 dark:border-white/10">
             <div className="flex flex-col items-center gap-3 text-center">
-              <Avatar className="h-20 w-20 ring-4 ring-blue-100 ring-offset-2 shadow-lg dark:ring-blue-900/50 dark:ring-offset-slate-900">
-                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">
-                  {sessionInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{sessionName}</p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">{sessionEmail}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">System Management</p>
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  {sessionRoleLabel}
-                </span>
-              </div>
+              {showSessionSkeleton ? (
+                <div className="flex w-full flex-col items-center gap-3">
+                  <Skeleton className="h-20 w-20 rounded-full" />
+                  <div className="flex w-full flex-col items-center gap-1.5">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="mt-1 h-5 w-20 rounded-full" />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Avatar className="h-20 w-20 ring-4 ring-blue-100 ring-offset-2 shadow-lg dark:ring-blue-900/50 dark:ring-offset-slate-900">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold text-white">
+                      {sessionInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100">{sessionName}</p>
+                    {sessionEmail ? <p className="text-xs text-blue-600 dark:text-blue-400">{sessionEmail}</p> : null}
+                    <p className="text-xs text-slate-500 dark:text-slate-400">System Management</p>
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                      {sessionRoleLabel}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -2513,6 +2736,17 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 <FileText className="h-4 w-4" />
                 Curriculum
               </Link>
+              <Link
+                href={getAdminTabHref("student-list")}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
+                  activeAdminTab === "student-list"
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Student List
+              </Link>
             </div>
 
             <div className="space-y-1 border-t border-slate-200/80 pt-3 dark:border-white/10">
@@ -2541,7 +2775,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                   className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100"
                   asChild
                 >
-                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                  <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>
                 </Button>
               </div>
               <div className="pl-9">
@@ -2804,18 +3038,28 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
               <div className="hidden h-5 w-px bg-slate-200 dark:bg-white/10 sm:block" />
               
               <div className="hidden sm:flex items-center gap-2">
-                <AvatarActionsMenu
-                  initials={sessionInitials}
-                  onLogout={handleLogout}
-                  onSettings={() => handleNavClick("Settings")}
-                  name={sessionName}
-                  subtitle={sessionEmail}
-                  triggerName={sessionName}
-                  triggerSubtitle={sessionEmail}
-                  triggerId="admin-avatar-menu-trigger"
-                  triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10"
-                  fallbackClassName="bg-blue-600 text-white"
-                />
+                {showSessionSkeleton ? (
+                  <div className="flex items-center gap-2 rounded-xl px-2 py-1.5">
+                    <div className="text-right">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="mt-1 h-3 w-28" />
+                    </div>
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                  </div>
+                ) : (
+                  <AvatarActionsMenu
+                    initials={sessionInitials}
+                    onLogout={handleLogout}
+                    onSettings={() => handleNavClick("Settings")}
+                    name={sessionName}
+                    subtitle={sessionEmail}
+                    triggerName={sessionName}
+                    triggerSubtitle={sessionEmail}
+                    triggerId="admin-avatar-menu-trigger"
+                    triggerClassName="rounded-xl px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10"
+                    fallbackClassName="bg-blue-600 text-white"
+                  />
+                )}
               </div>
               {!mobileMenuOpen && (
                 <Button
@@ -2914,6 +3158,17 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
               >
                 <BarChart3 className="h-4 w-4" />
                 Reports
+              </button>
+              <button
+                onClick={() => setAdminTabFromMobile("student-list")}
+                className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  activeAdminTab === "student-list"
+                    ? "border-blue-500 bg-blue-600 text-white dark:border-blue-400/70 dark:bg-blue-500"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Student List
               </button>
               <button
                 onClick={() => {
@@ -3075,6 +3330,16 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Departments
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  navigateToAdminTab("student-list");
+                  setMobileSearchOpen(false);
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Student List
               </button>
               <button
                 type="button"
@@ -3510,6 +3775,119 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 </Card>
               </TabsContent>
 
+              <TabsContent value="student-list" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <CardTitle>Student List</CardTitle>
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                        <input
+                          ref={studentListImportInputRef}
+                          type="file"
+                          accept=".csv,text/csv"
+                          className="hidden"
+                          onChange={handleImportStudentListCsv}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => studentListImportInputRef.current?.click()}
+                        >
+                          Import CSV
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleExportStudentListCsv}
+                        >
+                          Export CSV
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <div className="w-full sm:w-64">
+                        <Select value={studentListCourseFilter} onValueChange={setStudentListCourseFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Filter by course" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Courses</SelectItem>
+                            {studentListCourseOptions.map((course) => (
+                              <SelectItem key={course} value={course}>
+                                {course}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-full sm:w-56">
+                        <Select value={studentListYearFilter} onValueChange={setStudentListYearFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Filter by year level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Year Levels</SelectItem>
+                            {studentListYearOptions.map((yearLevel) => (
+                              <SelectItem key={yearLevel} value={yearLevel}>
+                                {yearLevel}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="w-full overflow-x-auto">
+                      <Table className="min-w-[900px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>first_name</TableHead>
+                            <TableHead>last_name</TableHead>
+                            <TableHead>email</TableHead>
+                            <TableHead>course</TableHead>
+                            <TableHead>year_level</TableHead>
+                            <TableHead>gender</TableHead>
+                            <TableHead>student_number</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loadingAdmissions ? (
+                            Array.from({ length: 4 }).map((_, index) => (
+                              <TableRow key={`student-list-skeleton-${index}`}>
+                                <TableCell colSpan={7}>
+                                  <Skeleton className="h-4 w-full" />
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : filteredStudentListRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="py-8 text-center text-slate-500">
+                                No students found.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredStudentListRows.map((row) => (
+                              <TableRow key={row.id}>
+                                <TableCell>{row.first_name}</TableCell>
+                                <TableCell>{row.last_name}</TableCell>
+                                <TableCell>{row.email}</TableCell>
+                                <TableCell>{row.course}</TableCell>
+                                <TableCell>{row.year_level}</TableCell>
+                                <TableCell>{row.gender}</TableCell>
+                                <TableCell>{row.student_number}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
               <TabsContent value="reports" className="mt-6">
                 <Card>
                   <CardHeader>
@@ -3600,7 +3978,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                   </CardHeader>
                   <CardContent className="flex flex-wrap gap-2">
                     <Button asChild>
-                      <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />School Organizational Chart</Link>
+                      <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>
                     </Button>
                     <Button asChild variant="outline">
                       <Link href="/admin/departments/courses-list"><BookOpen className="mr-1.5 h-3.5 w-3.5" />Courses List</Link>
@@ -5532,4 +5910,5 @@ export default function AdminDashboard() {
     </Suspense>
   );
 }
+
 

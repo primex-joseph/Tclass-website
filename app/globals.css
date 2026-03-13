@@ -736,7 +736,7 @@
 }
 
 .field-complete-flash::after {
-  content: "✓";
+  content: "âœ“";
   position: absolute;
   right: -0.35rem;
   top: -0.35rem;
@@ -1091,6 +1091,44 @@
 
   .admin-page [data-slot="dialog-content"] > div:not([class]) {
     padding: 0 !important;
+  }
+
+  /* Admin pages scrollbar theme */
+  .admin-page,
+  .admin-page * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  }
+
+  .admin-page ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .admin-page ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .admin-page ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.5);
+    border-radius: 9999px;
+  }
+
+  .admin-page ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.7);
+  }
+
+  .dark .admin-page,
+  .dark .admin-page * {
+    scrollbar-color: rgba(71, 85, 105, 0.75) transparent;
+  }
+
+  .dark .admin-page ::-webkit-scrollbar-thumb {
+    background: rgba(71, 85, 105, 0.7);
+  }
+
+  .dark .admin-page ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.8);
   }
 
   /* Modal Header with Gradient */
