@@ -113,7 +113,7 @@ export function LogoutModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
-      <DialogContent className="sm:max-w-md overflow-hidden border-slate-200 bg-white p-0 shadow-2xl dark:border-white/15 dark:bg-slate-950">
+      <DialogContent hideCloseButton className="sm:max-w-md overflow-hidden border-slate-200 bg-white p-0 shadow-2xl dark:border-white/15 dark:bg-slate-950">
         {/* Loading bar at top */}
         <div className="relative h-1.5 w-full bg-slate-100 dark:bg-slate-800">
           <div

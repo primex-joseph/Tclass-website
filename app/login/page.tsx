@@ -8,7 +8,6 @@ import toast from "react-hot-toast";
 import {
   AlertCircle,
   ArrowLeft,
-  Building2,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -47,11 +46,26 @@ type LoginResponse = {
 type ForgotPasswordStep = "send" | "verify" | "reset" | "success";
 type EmailCheckStatus = "idle" | "checking" | "valid" | "invalid";
 
-const userTypes = [
-  { id: "student" as UserRole, label: "Student", icon: Users },
-  { id: "faculty" as UserRole, label: "Faculty", icon: Building2 },
-  { id: "admin" as UserRole, label: "Admin", icon: ShieldCheck },
-] as const;
+function getSafeEmailCheckError(status: number, message?: string): string {
+  if (status === 404) {
+    return "No email address found.";
+  }
+
+  if (status === 422) {
+    return "Invalid email address.";
+  }
+
+  if (status >= 500) {
+    return "Unable to verify the email address right now.";
+  }
+
+  const normalizedMessage = (message ?? "").toUpperCase();
+  if (normalizedMessage.includes("SQLSTATE") || normalizedMessage.includes("EXCEPTION")) {
+    return "Unable to verify the email address right now.";
+  }
+
+  return message ?? "Unable to verify the email address right now.";
+}
 
 function LoginPageContent() {
   const router = useRouter();
@@ -59,10 +73,8 @@ function LoginPageContent() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userType, setUserType] = useState<UserRole>("student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [switchingRole, setSwitchingRole] = useState<UserRole | null>(null);
 
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [forgotStep, setForgotStep] = useState<ForgotPasswordStep>("send");
@@ -149,7 +161,7 @@ function LoginPageContent() {
         if (!response.ok) {
           setEmailCheckStatus("invalid");
           setEmailCheckMessage("");
-          setEmailError(emailTouched ? data.message ?? "No email address found." : "");
+          setEmailError(getSafeEmailCheckError(response.status, data.message));
           return;
         }
 
@@ -163,7 +175,7 @@ function LoginPageContent() {
 
         setEmailCheckStatus("invalid");
         setEmailCheckMessage("");
-        setEmailError(emailTouched ? "Unable to verify the email address right now." : "");
+        setEmailError("Unable to verify the email address right now.");
       }
     }, 450);
 
@@ -244,14 +256,13 @@ function LoginPageContent() {
   };
 
   const handleOpenForgotPassword = async () => {
-    setEmailTouched(true);
-
     if (!apiBaseUrl) {
       toast.error("Missing NEXT_PUBLIC_API_BASE_URL in env.");
       return;
     }
 
     if (!normalizedEmail) {
+      setEmailTouched(true);
       setEmailCheckStatus("invalid");
       setEmailError("Enter your email address first.");
       return;
@@ -259,12 +270,14 @@ function LoginPageContent() {
 
     const validation = validateEmail(normalizedEmail);
     if (!validation.valid) {
+      setEmailTouched(true);
       setEmailCheckStatus("invalid");
       setEmailError(validation.error ?? "Invalid email address.");
       return;
     }
 
     let verified = forgotPasswordReady;
+    let checkerUnavailable = false;
 
     if (!verified) {
       setEmailCheckStatus("checking");
@@ -284,20 +297,27 @@ function LoginPageContent() {
         const data = (await response.json().catch(() => ({}))) as { message?: string; email?: string };
 
         if (!response.ok) {
-          setEmailCheckStatus("invalid");
-          setEmailCheckMessage("");
-          setEmailError(data.message ?? "No email address found.");
-          return;
-        }
+          const safeError = getSafeEmailCheckError(response.status, data.message);
 
-        setEmailCheckStatus("valid");
-        setEmailError("");
-        setEmailCheckMessage(data.email ? `Account found: ${data.email}` : "Email address found.");
-        verified = true;
+          if (response.status === 404 || response.status === 422) {
+            setEmailTouched(true);
+            setEmailCheckStatus("invalid");
+            setEmailCheckMessage("");
+            setEmailError(safeError);
+            return;
+          }
+
+          checkerUnavailable = true;
+          verified = true;
+        } else {
+          setEmailCheckStatus("valid");
+          setEmailError("");
+          setEmailCheckMessage(data.email ? `Account found: ${data.email}` : "Email address found.");
+          verified = true;
+        }
       } catch {
-        setEmailCheckStatus("invalid");
-        setEmailError("Unable to verify the email address right now.");
-        return;
+        checkerUnavailable = true;
+        verified = true;
       }
     }
 
@@ -312,7 +332,11 @@ function LoginPageContent() {
     setForgotCaptchaVerified(false);
     setForgotFieldError(null);
     setPasswordFieldError(null);
-    setForgotStatus(null);
+    setForgotStatus(
+      checkerUnavailable
+        ? { type: "info", message: "Email checker is temporarily unavailable. You can still request a reset code." }
+        : null
+    );
     setForgotPasswordOpen(true);
   };
 
@@ -449,31 +473,54 @@ function LoginPageContent() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          role: userType,
-        }),
-      });
+      const roleCandidates: UserRole[] = ["student", "faculty", "admin"];
+      let token: string | undefined;
+      let role: UserRole | null = null;
+      let blockedByRole = false;
 
-      const data: LoginResponse = await response.json().catch(() => ({}));
+      for (const candidateRole of roleCandidates) {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            role: candidateRole,
+          }),
+        });
 
-      if (!response.ok) {
-        toast.error(data.message ?? "Invalid credentials.");
+        const data: LoginResponse = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          token = data.token ?? data.access_token;
+          role = normalizeRole(data.user?.role ?? data.role) ?? candidateRole;
+          break;
+        }
+
+        if (response.status === 401) {
+          toast.error(data.message ?? "Invalid credentials.");
+          return;
+        }
+
+        if (response.status === 403) {
+          blockedByRole = true;
+          continue;
+        }
+
+        toast.error(data.message ?? "Unable to sign in.");
         return;
       }
 
-      const token = data.token ?? data.access_token;
-      const role = normalizeRole(data.user?.role ?? data.role) ?? userType;
-
       if (!token) {
-        toast.error("No token returned by backend.");
+        toast.error(blockedByRole ? "No active portal role assigned to this account." : "Unable to sign in.");
+        return;
+      }
+
+      if (!role) {
+        toast.error("No role returned by backend.");
         return;
       }
 
@@ -589,57 +636,9 @@ function LoginPageContent() {
           <div className="hidden lg:flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Sign In</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Select your account type to continue</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Use your account credentials to continue</p>
             </div>
             <ThemeIconButton />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            {userTypes.map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => {
-                  if (type.id !== userType) {
-                    setSwitchingRole(type.id);
-                    setTimeout(() => {
-                      setUserType(type.id);
-                      setSwitchingRole(null);
-                    }, 400);
-                  }
-                }}
-                disabled={switchingRole !== null}
-                className={`relative flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 overflow-hidden ${
-                  userType === type.id
-                    ? "border-blue-600 bg-blue-50 dark:bg-blue-500/10"
-                    : "border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700"
-                } ${switchingRole === type.id ? "scale-95" : ""}`}
-              >
-                {switchingRole === type.id && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-slate-900/20 backdrop-blur-[2px] z-10">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  </div>
-                )}
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
-                    userType === type.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
-                  }`}
-                >
-                  <type.icon className="h-5 w-5" />
-                </div>
-                <span
-                  className={`text-sm font-medium ${
-                    userType === type.id ? "text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400"
-                  }`}
-                >
-                  {type.label}
-                </span>
-              </button>
-            ))}
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
@@ -674,7 +673,7 @@ function LoginPageContent() {
                   required
                 />
               </div>
-              {emailTouched && emailError ? (
+              {emailError ? (
                 <p className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
                   <AlertCircle className="h-3.5 w-3.5" />
                   <span>{emailError}</span>
@@ -747,7 +746,7 @@ function LoginPageContent() {
                   Signing In...
                 </span>
               ) : (
-                `Sign In as ${userType.charAt(0).toUpperCase() + userType.slice(1)}`
+                "Sign In"
               )}
             </Button>
           </form>
