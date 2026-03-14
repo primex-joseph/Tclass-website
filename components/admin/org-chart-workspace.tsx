@@ -33,6 +33,7 @@ import {
   Home,
   Image as ImageIcon,
   LayoutTemplate,
+  Keyboard,
   MousePointer2,
   PencilLine,
   Plus,
@@ -118,6 +119,19 @@ const TOOLBAR_ITEMS = [
   { key: "note" as const, icon: StickyNote, label: "Note", shortcut: "D" },
   { key: "text" as const, icon: PencilLine, label: "Text", shortcut: "T" },
   { key: "image" as const, icon: ImageIcon, label: "Image", shortcut: "I" },
+];
+
+const SHORTCUT_TIPS = [
+  { keys: "V", description: "Select tool" },
+  { keys: "H", description: "Hand tool" },
+  { keys: "N", description: "New role node" },
+  { keys: "D", description: "New note node" },
+  { keys: "T", description: "New text panel" },
+  { keys: "Shift + Click", description: "Toggle multi-select" },
+  { keys: "Space + Drag", description: "Pan canvas" },
+  { keys: "Delete", description: "Remove selection" },
+  { keys: "Ctrl/Cmd + Z/Y", description: "Undo/redo" },
+  { keys: "Ctrl/Cmd + 0", description: "Reset zoom" },
 ];
 
 const LEFT_RAIL_ITEMS = [
@@ -504,6 +518,7 @@ function OrgChartCanvas() {
   const [editorDraft, setEditorDraft] = useState<NodeEditorDraft | null>(null);
   const [activeInlineEdit, setActiveInlineEdit] = useState<ActiveInlineEdit>(null);
   const [activeInspectorNodeId, setActiveInspectorNodeId] = useState<string | null>(null);
+  const [isShortcutHelpOpen, setIsShortcutHelpOpen] = useState(false);
   const [rfNodes, setRfNodes] = useNodesState<OrgFlowNode>([]);
 
   const flowRef = useRef<ReactFlowInstance<OrgFlowNode, Edge> | null>(null);
@@ -511,6 +526,7 @@ function OrgChartCanvas() {
   const saveTimerRef = useRef<number | null>(null);
   const inputCommitTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const shortcutHelpRef = useRef<HTMLDivElement | null>(null);
   const inspectorEditingRef = useRef(false);
   const inlineEditingRef = useRef(false);
   const editorDraftRef = useRef<NodeEditorDraft | null>(null);
@@ -809,7 +825,7 @@ function OrgChartCanvas() {
         name: kind === "role" ? "" : kind === "company" ? "Company" : "Notes",
         position:
           kind === "role"
-            ? "CEO"
+            ? "Executive Staff"
             : kind === "legend"
               ? "LEGEND"
               : kind === "company"
@@ -837,6 +853,24 @@ function OrgChartCanvas() {
     },
     [pushUndo, setModelNodes, syncCanvasSelection],
   );
+
+  const quickAddSampleNode = useCallback(() => {
+    pushUndo();
+    setModelNodes((prev) => [
+      ...prev,
+      ensureRoleNodeDefaults({
+        id: makeNodeId(),
+        name: "Full Name",
+        position: "Executive Staff",
+        parentId: null,
+        createdAt: Date.now(),
+        x: 640,
+        y: 210,
+        note: ROLE_TASK_PLACEHOLDER,
+        kind: "role",
+      }),
+    ]);
+  }, [pushUndo, setModelNodes]);
 
   const deleteSelected = useCallback(() => {
     if (!selectedIds.length) return;
@@ -1203,6 +1237,9 @@ function OrgChartCanvas() {
         resetViewport();
         return;
       }
+      if (key === "escape") {
+        setIsShortcutHelpOpen(false);
+      }
 
       if (key === "v") setToolMode("select");
       if (key === "h") setToolMode("pan");
@@ -1222,6 +1259,21 @@ function OrgChartCanvas() {
       }
     };
   }, [addNode, deleteSelected, handleRedo, handleUndo, nudgeZoom, resetViewport]);
+
+  useEffect(() => {
+    if (!isShortcutHelpOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as globalThis.Node | null;
+      if (target && shortcutHelpRef.current?.contains(target)) return;
+      setIsShortcutHelpOpen(false);
+    };
+
+    window.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [isShortcutHelpOpen]);
 
   const zoomPercent = Math.round((viewport.zoom || 1) * 100);
 
@@ -1361,6 +1413,32 @@ function OrgChartCanvas() {
               <Redo2 size={16} />
             </button>
           </div>
+
+          <div ref={shortcutHelpRef} className={styles.shortcutHelpFloating}>
+            {isShortcutHelpOpen ? (
+              <div className={styles.shortcutHelpPopover}>
+                <p className={styles.shortcutHelpTitle}>Shortcuts</p>
+                <ul className={styles.shortcutHelpList}>
+                  {SHORTCUT_TIPS.map((tip) => (
+                    <li key={tip.keys}>
+                      <kbd>{tip.keys}</kbd>
+                      <span>{tip.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className={styles.shortcutHelpBadge}
+              onClick={() => setIsShortcutHelpOpen((prev) => !prev)}
+              aria-label="Toggle shortcut tips"
+              aria-expanded={isShortcutHelpOpen}
+            >
+              <Keyboard size={15} />
+              <span>Shortcuts</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1382,6 +1460,20 @@ function OrgChartCanvas() {
           <p className={styles.statusValue}>{saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : saveState === "error" ? "Error" : "Idle"}</p>
           <p className={styles.statusHint}>{saveMessage}</p>
           {isHydrationFromFallback ? <p className={styles.warning}>Server fetch failed. Running from local cache/seed.</p> : null}
+        </div>
+
+        <div className={styles.actionsCard}>
+          <p className={styles.editorTitle}>Actions</p>
+          <div className={styles.inlineActions}>
+            <button type="button" className={styles.softBtn} onClick={() => addNode("role")}>
+              <Plus size={14} />
+              Add Role
+            </button>
+            <button type="button" className={styles.softBtn} onClick={quickAddSampleNode}>
+              <ArrowRightLeft size={14} />
+              Quick Add Sample
+            </button>
+          </div>
         </div>
 
         <div className={styles.editorCard}>
@@ -1538,46 +1630,6 @@ function OrgChartCanvas() {
           )}
         </div>
 
-        <div className={styles.shortcutCard}>
-          <p className={styles.editorTitle}>Shortcuts</p>
-          <ul>
-            <li>`V` Select tool</li>
-            <li>`H` Hand tool</li>
-            <li>`N` New role node</li>
-            <li>`D` New note node</li>
-            <li>`T` New text panel</li>
-            <li>`Shift + Click` Toggle multi-select</li>
-            <li>`Space + Drag` Pan canvas</li>
-            <li>`Delete` Remove selection</li>
-            <li>`Ctrl/Cmd + Z/Y` Undo/redo</li>
-            <li>`Ctrl/Cmd + 0` Reset zoom</li>
-          </ul>
-          <button type="button" className={styles.softBtn} onClick={() => addNode("role")}>
-            <Plus size={14} />
-            Add Role
-          </button>
-          <button
-            type="button"
-            className={styles.softBtn}
-              onClick={() => {
-                pushUndo();
-                setModelNodes((prev) => [...prev, ensureRoleNodeDefaults({
-                  id: makeNodeId(),
-                name: "Full Name",
-                position: "Executive Staff",
-                parentId: null,
-                createdAt: Date.now(),
-                x: 640,
-                y: 210,
-                note: ROLE_TASK_PLACEHOLDER,
-                kind: "role",
-              })]);
-            }}
-          >
-            <ArrowRightLeft size={14} />
-            Quick Add Sample
-          </button>
-        </div>
       </aside>
 
       <input ref={fileInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={handleImageUpload} />
@@ -1592,4 +1644,3 @@ export function OrgChartWorkspace() {
     </ReactFlowProvider>
   );
 }
-

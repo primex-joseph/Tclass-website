@@ -422,7 +422,7 @@
 
 .statusCard,
 .editorCard,
-.shortcutCard {
+.actionsCard {
   border: 1px solid var(--oc-surface-border);
   border-radius: 14px;
   background: var(--oc-surface-bg);
@@ -580,18 +580,81 @@
   background: var(--oc-danger-bg);
 }
 
-.shortcutCard ul {
-  margin: 0;
-  padding-left: 16px;
-  display: grid;
-  gap: 4px;
-  color: var(--oc-text-muted);
-  font-size: 12px;
+.shortcutHelpFloating {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 
-.shortcutCard .softBtn {
-  margin-top: 10px;
-  margin-right: 8px;
+.shortcutHelpBadge {
+  border: 1px solid var(--oc-floating-border);
+  border-radius: 999px;
+  background: var(--oc-floating-bg);
+  color: var(--oc-text-primary);
+  min-height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px var(--oc-selection-shadow);
+}
+
+.shortcutHelpBadge:hover {
+  background: var(--oc-floating-button-hover-bg);
+}
+
+.shortcutHelpPopover {
+  width: 280px;
+  max-width: min(280px, calc(100vw - 120px));
+  border: 1px solid var(--oc-surface-border);
+  border-radius: 12px;
+  background: var(--oc-surface-bg);
+  box-shadow: 0 14px 36px var(--oc-selection-shadow);
+  padding: 10px 11px;
+}
+
+.shortcutHelpTitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--oc-text-primary);
+}
+
+.shortcutHelpList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.shortcutHelpList li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--oc-text-muted);
+}
+
+.shortcutHelpList kbd {
+  border: 1px solid var(--oc-kbd-border);
+  border-radius: 6px;
+  background: var(--oc-kbd-bg);
+  color: var(--oc-text-primary);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  white-space: nowrap;
 }
 
 .hiddenInput {
@@ -834,6 +897,10 @@
     border-radius: 14px;
     z-index: 20;
   }
+
+  .shortcutHelpFloating {
+    right: 326px;
+  }
 }
 
 @media (max-width: 920px) {
@@ -868,5 +935,10 @@
 
   .dock {
     left: 46%;
+  }
+
+  .shortcutHelpFloating {
+    right: 10px;
+    bottom: calc(42vh + 24px);
   }
 }
