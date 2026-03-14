@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Plus,
   School,
+  ShieldCheck,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -372,6 +373,7 @@ function AdminCurriculumPageContent() {
               <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Management</p>
               <Link href="/admin/programs" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><BookOpen className="h-4 w-4" />Programs</Link>
               <Link href="/admin/departments" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><Building2 className="h-4 w-4" />Departments</Link>
+              <Link href="/admin/rbac" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><ShieldCheck className="h-4 w-4" />Faculty RBAC</Link>
               <div className="pl-9">
                 <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
                   <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>

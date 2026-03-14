@@ -2828,6 +2828,13 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 <Building2 className="h-4 w-4" />
                 Departments
               </Link>
+              <Link
+                href="/admin/rbac"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+              >
+                <Users className="h-4 w-4" />
+                Faculty RBAC
+              </Link>
               <div className="pl-9">
                 <Button
                   type="button"
@@ -3325,6 +3332,14 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 <Calendar className="h-4 w-4" />
                 Class Scheduling
               </Link>
+              <Link
+                href="/admin/rbac"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+              >
+                <Users className="h-4 w-4" />
+                Faculty RBAC
+              </Link>
             </div>
 
             <div className="border-t border-slate-200 p-3 dark:border-white/15">
@@ -3428,9 +3443,19 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                 type="button"
                 onClick={() => {
                   setMobileSearchOpen(false);
+                  router.push("/admin/rbac");
+                }}
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                RBAC
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen(false);
                   router.push("/admin/enrollments");
                 }}
-                className="col-span-2 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Enrollments
               </button>

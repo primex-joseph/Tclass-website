@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BarChart3, BookOpen, Building2, Calendar, CheckCircle, FileText, MessageSquare, School } from "lucide-react";
+import { BarChart3, BookOpen, Building2, Calendar, CheckCircle, FileText, MessageSquare, School, ShieldCheck } from "lucide-react";
 
 import { EditableOrgChart } from "@/components/admin/editable-org-chart";
 import { AdminCsvImportTrigger } from "@/components/admin/csv-import-trigger";
@@ -78,6 +78,7 @@ export default function AdminDepartmentsPage() {
               <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Management</p>
               <Link href="/admin/programs" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><BookOpen className="h-4 w-4" />Programs</Link>
               <Link href="/admin/departments" className="flex w-full items-center gap-3 rounded-xl bg-blue-600 px-3 py-2.5 text-left text-sm font-medium text-white"><Building2 className="h-4 w-4" />Departments</Link>
+              <Link href="/admin/rbac" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"><ShieldCheck className="h-4 w-4" />Faculty RBAC</Link>
               <div className="pl-9">
                 <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/15" asChild>
                   <Link href="/admin/departments"><Building2 className="mr-1.5 h-3.5 w-3.5" />Organizational Chart</Link>

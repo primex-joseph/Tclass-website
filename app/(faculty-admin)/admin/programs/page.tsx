@@ -16,6 +16,7 @@ import {
   Pencil,
   Plus,
   School,
+  ShieldCheck,
 } from "lucide-react";
 
 import { apiFetch } from "@/lib/api-client";
@@ -369,6 +370,13 @@ export default function AdminProgramsPage() {
               >
                 <Building2 className="h-4 w-4" />
                 Departments
+              </Link>
+              <Link
+                href="/admin/rbac"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/10"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Faculty RBAC
               </Link>
               <div className="pl-9">
                 <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-slate-100" asChild>
