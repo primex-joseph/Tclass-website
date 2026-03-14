@@ -1,55 +1,59 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
-
-type OrgChartNode = {
-  id: string;
-  name: string;
-  position: string;
-  parentId: string | null;
-  createdAt: number;
-};
+import {
+  ORG_CHART_CANVAS_VERSION,
+  getClickupOrgChartSeedPayload,
+  normalizeOrgChartPayload,
+  withUpgradedLayout,
+} from "@/lib/org-chart-canvas";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "org-chart.json");
 
-const normalizeNodes = (input: unknown): OrgChartNode[] => {
-  if (!Array.isArray(input)) return [];
-  return input
-    .filter((row): row is Partial<OrgChartNode> => Boolean(row && typeof row === "object"))
-    .map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      position: String(row.position ?? ""),
-      parentId: row.parentId ? String(row.parentId) : null,
-      createdAt: Number.isFinite(row.createdAt) ? Number(row.createdAt) : Date.now(),
-    }))
-    .filter((row) => row.id.length > 0 && row.position.length > 0)
-    .sort((a, b) => a.createdAt - b.createdAt);
-};
-
-async function readNodes(): Promise<OrgChartNode[]> {
+async function readPayload() {
   try {
     const content = await fs.readFile(DATA_FILE, "utf8");
-    const parsed = JSON.parse(content) as { nodes?: unknown };
-    return normalizeNodes(parsed.nodes);
+    const parsed = JSON.parse(content) as unknown;
+    const normalized = normalizeOrgChartPayload(parsed);
+    if (normalized.nodes.length === 0) {
+      return normalizeOrgChartPayload(getClickupOrgChartSeedPayload());
+    }
+    return withUpgradedLayout(normalized);
   } catch {
-    return [];
+    return normalizeOrgChartPayload(getClickupOrgChartSeedPayload());
   }
 }
 
 export async function GET() {
-  const nodes = await readNodes();
-  return NextResponse.json({ nodes });
+  const payload = await readPayload();
+  return NextResponse.json({
+    nodes: payload.nodes,
+    viewport: payload.viewport,
+    meta: {
+      version: ORG_CHART_CANVAS_VERSION,
+      updatedAt: Date.now(),
+      ...payload.meta,
+    },
+  });
 }
 
 export async function PUT(request: Request) {
   try {
-    const body = (await request.json()) as { nodes?: unknown };
-    const nodes = normalizeNodes(body.nodes);
+    const body = (await request.json()) as unknown;
+    const normalized = withUpgradedLayout(normalizeOrgChartPayload(body));
+    const payload = {
+      nodes: normalized.nodes,
+      viewport: normalized.viewport,
+      meta: {
+        version: ORG_CHART_CANVAS_VERSION,
+        updatedAt: Date.now(),
+        ...normalized.meta,
+      },
+    };
     await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(DATA_FILE, JSON.stringify({ nodes }, null, 2), "utf8");
-    return NextResponse.json({ ok: true, nodes });
+    await fs.writeFile(DATA_FILE, JSON.stringify(payload, null, 2), "utf8");
+    return NextResponse.json({ ok: true, ...payload });
   } catch {
     return NextResponse.json({ message: "Failed to save organizational chart." }, { status: 500 });
   }
