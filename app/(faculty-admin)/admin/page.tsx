@@ -83,12 +83,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { apiFetch } from "@/lib/api-client";
-<<<<<<< HEAD
 import { clearPortalSessionUserCache, usePortalSessionUser } from "@/lib/portal-session-user";
-=======
 import { AdminCsvImportTrigger } from "@/components/admin/csv-import-trigger";
 import { AdminCsvGeneratorTrigger } from "@/components/admin/csv-generator-trigger";
->>>>>>> pr-2
 import { AvatarActionsMenu } from "@/components/ui/avatar-actions-menu";
 import { LogoutModal } from "@/components/ui/logout-modal";
 
