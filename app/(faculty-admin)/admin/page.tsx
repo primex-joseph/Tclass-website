@@ -97,6 +97,11 @@ interface UserItem {
   role: "Student" | "Faculty" | "Admin";
   status: "active" | "pending" | "inactive";
   joined: string;
+  employeeId?: string;
+  department?: string;
+  position?: string;
+  positionId?: number | null;
+  templateHint?: string | null;
 }
 
 interface BackendUserItem {
@@ -108,6 +113,11 @@ interface BackendUserItem {
   status?: string;
   student_number?: string | null;
   created_at?: string;
+  employee_id?: string | null;
+  department?: string | null;
+  position?: string | null;
+  position_id?: number | null;
+  template_hint?: string | null;
 }
 interface AdminStudentListItem {
   id?: number;
@@ -128,6 +138,14 @@ interface Department {
   faculty: number;
   students: number;
   classes: number;
+}
+
+interface FacultyPositionOption {
+  id: number;
+  code: string;
+  title: string;
+  category: string;
+  template_hint?: string | null;
 }
 
 interface ContactMessageItem {
@@ -501,6 +519,11 @@ const normalizeUsers = (rows: BackendUserItem[]): UserItem[] =>
     role: normalizeRole(row.role),
     status: normalizeStatus(row.status),
     joined: formatJoinedTime(row.created_at),
+    employeeId: row.employee_id ?? "",
+    department: row.department ?? "",
+    position: row.position ?? "",
+    positionId: row.position_id ?? null,
+    templateHint: row.template_hint ?? null,
   }));
 
 const extractUserRows = (payload: unknown): BackendUserItem[] => {
@@ -570,6 +593,8 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const admissionsLoadingRef = useRef(false);
   const departmentsLoadedRef = useRef(false);
   const departmentsLoadingRef = useRef(false);
+  const facultyPositionsLoadedRef = useRef(false);
+  const facultyPositionsLoadingRef = useRef(false);
   const usersLoadingRef = useRef<Record<"student" | "faculty" | "admin", boolean>>({
     student: false,
     faculty: false,
@@ -615,15 +640,17 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     email: string;
     password: string;
     role: "admin" | "faculty";
+    employeeId: string;
     department: string;
-    position: string;
+    positionId: string;
   }>({
     name: "",
     email: "",
     password: "",
     role: "admin",
+    employeeId: "",
     department: "",
-    position: "",
+    positionId: "",
   });
   
   // Data states
@@ -631,6 +658,7 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
   const { sessionUser, sessionResolved } = usePortalSessionUser();
   
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [facultyPositions, setFacultyPositions] = useState<FacultyPositionOption[]>([]);
   
   const [contactMessages, setContactMessages] = useState<ContactMessageItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -920,6 +948,27 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     []
   );
 
+  const loadFacultyPositions = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      if (facultyPositionsLoadingRef.current) return;
+      if (!force && facultyPositionsLoadedRef.current) return;
+
+      facultyPositionsLoadingRef.current = true;
+      try {
+        const response = await apiFetch("/admin/faculty/positions");
+        const rows = (response as { positions?: FacultyPositionOption[] }).positions ?? [];
+        setFacultyPositions(rows);
+        facultyPositionsLoadedRef.current = true;
+      } catch (error) {
+        setFacultyPositions([]);
+        toast.error(error instanceof Error ? error.message : "Failed to load faculty positions.");
+      } finally {
+        facultyPositionsLoadingRef.current = false;
+      }
+    },
+    [],
+  );
+
   const loadContactMessages = async (silent = false, limit = 20) => {
     if (!silent) {
       setLoadingMessages(true);
@@ -992,6 +1041,13 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     }
     void loadDepartmentsOverview();
   }, [activeAdminTab, loadDepartmentsOverview]);
+
+  useEffect(() => {
+    if (activeAdminTab !== "users" && !addUserOpen) {
+      return;
+    }
+    void loadFacultyPositions();
+  }, [activeAdminTab, addUserOpen, loadFacultyPositions]);
 
   useEffect(() => {
     if (activeAdminTab !== "student-list") {
@@ -1174,8 +1230,9 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
     const name = newUserForm.name.trim();
     const email = newUserForm.email.trim().toLowerCase();
     const password = newUserForm.password.trim();
+    const employeeId = newUserForm.employeeId.trim();
     const department = newUserForm.department.trim();
-    const position = newUserForm.position.trim();
+    const positionId = newUserForm.positionId ? Number(newUserForm.positionId) : undefined;
     const role = newUserForm.role;
 
     if (!name || !email) {
@@ -1197,8 +1254,9 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
           email,
           role,
           password: password || undefined,
+          employee_id: role === "faculty" ? employeeId || undefined : undefined,
           department: role === "faculty" ? department || undefined : undefined,
-          position: role === "faculty" ? position || undefined : undefined,
+          position_id: role === "faculty" ? positionId : undefined,
         }),
       }) as { message?: string; warning?: string | null; credentials_preview?: { temporary_password?: string | null } };
 
@@ -1208,8 +1266,9 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
         email: "",
         password: "",
         role: "admin",
+        employeeId: "",
         department: "",
-        position: "",
+        positionId: "",
       });
       setUserRoleFilter(role);
       await loadUsers({ role, force: true });
@@ -3642,6 +3701,9 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                         >
                           View all
                         </Button>
+                        <Button type="button" size="sm" variant="outline" asChild>
+                          <Link href="/admin/rbac">Faculty RBAC</Link>
+                        </Button>
                       </div>
                     </div>
                     <div>
@@ -3686,6 +3748,11 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
                               <p className="truncate text-xs text-slate-500">{user.email}</p>
+                              {user.role === "Faculty" && (user.position || user.department || user.employeeId) ? (
+                                <p className="truncate text-[11px] text-slate-400">
+                                  {[user.position, user.department, user.employeeId].filter(Boolean).join(" • ")}
+                                </p>
+                              ) : null}
                               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                                 <Badge variant={user.role === 'Student' ? 'secondary' : 'default'}>
                                   {user.role}
@@ -3749,6 +3816,11 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
                                   <div>
                                     <p className="font-medium text-slate-900">{user.name}</p>
                                     <p className="text-xs text-slate-500">{user.email}</p>
+                                    {user.role === "Faculty" && (user.position || user.department || user.employeeId) ? (
+                                      <p className="text-[11px] text-slate-400">
+                                        {[user.position, user.department, user.employeeId].filter(Boolean).join(" • ")}
+                                      </p>
+                                    ) : null}
                                   </div>
                                 </div>
                               </TableCell>
@@ -4887,26 +4959,56 @@ function AdminDashboardPage({ initialAdminTab = "users" }: AdminDashboardProps) 
               />
             </div>
             {newUserForm.role === "faculty" && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="new-user-employee-id" className="text-slate-700 dark:text-slate-300">Employee ID</Label>
+                  <Input
+                    id="new-user-employee-id"
+                    placeholder="e.g. FAC-2026-001"
+                    value={newUserForm.employeeId}
+                    onChange={(e) => setNewUserForm((prev) => ({ ...prev, employeeId: e.target.value }))}
+                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-user-department" className="text-slate-700 dark:text-slate-300">Department</Label>
                   <Input
                     id="new-user-department"
-                    placeholder="e.g. IT Department"
+                    placeholder="e.g. College of Information Technology"
                     value={newUserForm.department}
                     onChange={(e) => setNewUserForm((prev) => ({ ...prev, department: e.target.value }))}
                     className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="new-user-position" className="text-slate-700 dark:text-slate-300">Position</Label>
-                  <Input
-                    id="new-user-position"
-                    placeholder="e.g. Instructor"
-                    value={newUserForm.position}
-                    onChange={(e) => setNewUserForm((prev) => ({ ...prev, position: e.target.value }))}
-                    className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 dark:[color-scheme:dark]"
-                  />
+                  <Select
+                    value={newUserForm.positionId}
+                    onValueChange={(value) => setNewUserForm((prev) => ({ ...prev, positionId: value }))}
+                  >
+                    <SelectTrigger
+                      id="new-user-position"
+                      className="h-11 rounded-xl border-slate-300 bg-white px-3 text-slate-900 shadow-sm transition-colors focus:ring-0 focus:ring-offset-0 focus-visible:border-blue-400 focus-visible:ring-0 focus-visible:outline-none data-[state=open]:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:border-blue-400 dark:data-[state=open]:border-blue-400"
+                    >
+                      <SelectValue placeholder="Select faculty position" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                      {facultyPositions.map((position) => (
+                        <SelectItem key={position.id} value={String(position.id)} className="text-slate-900 dark:text-slate-100">
+                          {position.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="sm:col-span-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                  {newUserForm.positionId
+                    ? (() => {
+                        const selectedPosition = facultyPositions.find((position) => String(position.id) === newUserForm.positionId);
+                        if (!selectedPosition) return "Selected position is not available in the current faculty position catalog.";
+                        return `${selectedPosition.category || "Faculty"} • Template hint: ${selectedPosition.template_hint ?? "faculty-template.default"}`;
+                      })()
+                    : "Choose from the seeded PH faculty positions so cloned local setups stay aligned."}
                 </div>
               </div>
             )}

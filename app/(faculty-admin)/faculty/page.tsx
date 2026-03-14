@@ -14,7 +14,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogoutModal } from "@/components/ui/logout-modal";
 import { GlobalSearchInput } from "@/components/shared/global-search-input";
 import { PortalHeader, PortalSidebar } from "@/components/shared/portal-shell";
-import { facultyProfile } from "./_components/faculty-data";
 import { HomeSection } from "./_components/home-section";
 import { ClassSchedulesSection } from "./_components/class-schedules-section";
 import { ClassListsSection } from "./_components/class-lists-section";
@@ -25,6 +24,7 @@ import {
   OnlinePdsSection,
   WifiAccessSection,
 } from "./_components/placeholder-sections";
+import { clearFacultyPortalCache, getFacultyMe } from "./_components/faculty-portal-cache";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type NavSection =
@@ -41,6 +41,14 @@ type ChildNavItem = { label: string; icon: React.ElementType; section: NavSectio
 type NavItem =
   | { label: string; icon: React.ElementType; section: NavSection; children?: never }
   | { label: string; icon: React.ElementType; section?: never; children: ChildNavItem[] };
+
+type FacultySessionInfo = {
+  name: string;
+  email: string;
+  facultyNumber: string;
+  initials: string;
+  position: string;
+};
 
 // ─── Section Labels ───────────────────────────────────────────────────────────
 const sectionLabel: Record<Exclude<NavSection, "home">, string> = {
@@ -222,7 +230,7 @@ function LiveClock() {
 // ─── Profile Dropdown ─────────────────────────────────────────────────────────
 type Theme = "light" | "dark" | "system";
 
-function ProfileDropdown({ onLogout }: { onLogout: () => void }) {
+function ProfileDropdown({ facultyProfile, onLogout }: { facultyProfile: FacultySessionInfo; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("system");
   const ref = useRef<HTMLDivElement>(null);
@@ -365,6 +373,52 @@ export default function FacultyPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [facultySession, setFacultySession] = useState<FacultySessionInfo>({
+    name: "Faculty Portal",
+    email: "faculty@tclass.local",
+    facultyNumber: "No employee ID yet",
+    initials: "FP",
+    position: "Faculty",
+  });
+
+  useEffect(() => {
+    let alive = true;
+
+    getFacultyMe()
+      .then((payload) => {
+        if (!alive) return;
+
+        const name = payload.user?.name?.trim() || "Faculty Portal";
+        const email = payload.user?.email?.trim() || "faculty@tclass.local";
+        const employeeId = payload.profile?.employee_id?.trim() || "No employee ID yet";
+        const position = payload.profile?.position?.trim() || "Faculty";
+        const initials =
+          name
+            .split(" ")
+            .filter(Boolean)
+            .map((part) => part[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase() || "FP";
+
+        setFacultySession({
+          name,
+          email,
+          facultyNumber: employeeId,
+          initials,
+          position,
+        });
+      })
+      .catch(() => {
+        if (!alive) return;
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const facultyProfile = facultySession;
 
   // Close sidebar on resize to desktop
   useEffect(() => {
@@ -410,6 +464,7 @@ export default function FacultyPage() {
   function handleLogout() {
     document.cookie = "tclass_token=; path=/; max-age=0";
     document.cookie = "tclass_role=; path=/; max-age=0";
+    clearFacultyPortalCache();
     toast.success("Logged out successfully");
     router.push("/login");
   }
@@ -544,7 +599,7 @@ export default function FacultyPage() {
                 >
                   <Search className="h-4 w-4" />
                 </button>
-                <ProfileDropdown onLogout={() => setShowLogoutModal(true)} />
+                <ProfileDropdown facultyProfile={facultyProfile} onLogout={() => setShowLogoutModal(true)} />
               </div>
             </div>
           </div>
@@ -594,7 +649,7 @@ export default function FacultyPage() {
           <div className="hidden h-5 w-px bg-slate-200 dark:bg-white/10 sm:block" />
 
           {/* Profile */}
-          <ProfileDropdown onLogout={() => setShowLogoutModal(true)} />
+          <ProfileDropdown facultyProfile={facultyProfile} onLogout={() => setShowLogoutModal(true)} />
           </div>
         </PortalHeader>
 

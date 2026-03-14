@@ -14,7 +14,33 @@ export function DisclaimerBanner({ text }: { text: string }) {
   );
 }
 
-export function AyTermRow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+type PeriodOption = {
+  id: number;
+  name: string;
+  is_active?: boolean;
+};
+
+export function AyTermRow({
+  value,
+  onChange,
+  periods = [],
+  onPrint,
+  onExport,
+  exportLabel = "Export",
+  printLabel = "Print",
+  disablePrint,
+  disableExport,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  periods?: PeriodOption[];
+  onPrint?: () => void;
+  onExport?: () => void;
+  exportLabel?: string;
+  printLabel?: string;
+  disablePrint?: boolean;
+  disableExport?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3">
@@ -24,20 +50,37 @@ export function AyTermRow({ value, onChange }: { value: string; onChange: (v: st
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="2024-2025-1">2024-2025 1st Semester</SelectItem>
-            <SelectItem value="2023-2024-2">2023-2024 2nd Semester</SelectItem>
-            <SelectItem value="2023-2024-1">2023-2024 1st Semester</SelectItem>
+            {periods.length > 0 ? (
+              periods.map((period) => (
+                <SelectItem key={period.id} value={String(period.id)}>
+                  {period.name}
+                  {period.is_active ? " (Active)" : ""}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem value={value || "0"}>{value || "No active period"}</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => toast.success("Printing...")}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onPrint ?? (() => toast.success("Printing..."))}
+          disabled={disablePrint}
+        >
           <Printer className="mr-1.5 h-4 w-4" />
-          Print
+          {printLabel}
         </Button>
-        <Button variant="outline" size="sm" onClick={() => toast.success("Exporting to Excel...")}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onExport ?? (() => toast.success("Exporting to Excel..."))}
+          disabled={disableExport}
+        >
           <Download className="mr-1.5 h-4 w-4" />
-          Export
+          {exportLabel}
         </Button>
       </div>
     </div>
