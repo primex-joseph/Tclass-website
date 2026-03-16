@@ -295,7 +295,7 @@ export default function AdminFacultyRbacPage() {
 
             {loading ? (
               <Card>
-                <CardContent className="p-6 text-sm text-slate-500">Loading faculty RBAC settings...</CardContent>
+                <CardContent className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading faculty RBAC settings...</CardContent>
               </Card>
             ) : (
               <div className="space-y-8">
@@ -303,23 +303,23 @@ export default function AdminFacultyRbacPage() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Card>
                       <CardContent className="flex items-center gap-3 p-4">
-                        <div className="rounded-lg bg-blue-100 p-2 text-blue-600">
+                        <div className="rounded-lg bg-blue-100 p-2 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
                           <ShieldCheck className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-xs uppercase text-slate-500">Templates</p>
-                          <p className="text-xl font-bold text-slate-900">{templates.length}</p>
+                          <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Templates</p>
+                          <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{templates.length}</p>
                         </div>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="flex items-center gap-3 p-4">
-                        <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600">
+                        <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
                           <Users className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-xs uppercase text-slate-500">Faculty Users</p>
-                          <p className="text-xl font-bold text-slate-900">{users.length}</p>
+                          <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Faculty Users</p>
+                          <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{users.length}</p>
                         </div>
                       </CardContent>
                     </Card>
@@ -328,8 +328,8 @@ export default function AdminFacultyRbacPage() {
 
                 <section className="space-y-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Permission Templates</h2>
-                    <p className="text-sm text-slate-600">These templates become the base permissions assigned to faculty accounts.</p>
+                    <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Permission Templates</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">These templates become the base permissions assigned to faculty accounts.</p>
                   </div>
                   <div className="grid gap-6 xl:grid-cols-3">
                     {templates.map((template) => (
@@ -343,7 +343,7 @@ export default function AdminFacultyRbacPage() {
                             {permissions.map((permission) => {
                               const checked = template.permissions.includes(permission.key);
                               return (
-                                <label key={`${template.key}-${permission.key}`} className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                <label key={`${template.key}-${permission.key}`} className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/15">
                                   <input
                                     type="checkbox"
                                     checked={checked}
@@ -351,8 +351,8 @@ export default function AdminFacultyRbacPage() {
                                     className="mt-1"
                                   />
                                   <span>
-                                    <span className="font-medium text-slate-900">{permission.label}</span>
-                                    <span className="mt-1 block text-xs text-slate-500">{permission.description}</span>
+                                    <span className="font-medium text-slate-900 dark:text-slate-100">{permission.label}</span>
+                                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{permission.description}</span>
                                   </span>
                                 </label>
                               );
@@ -370,8 +370,8 @@ export default function AdminFacultyRbacPage() {
                 <section className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold text-slate-900">Per-User Overrides</h2>
-                      <p className="text-sm text-slate-600">Apply a template first, then override individual permissions where needed.</p>
+                      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Per-User Overrides</h2>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Apply a template first, then override individual permissions where needed.</p>
                     </div>
                     <Input
                       value={userSearchQuery}
@@ -391,18 +391,18 @@ export default function AdminFacultyRbacPage() {
                               <div>
                                 <CardTitle>{user.name}</CardTitle>
                                 <CardDescription>{user.email}</CardDescription>
-                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                                   {user.employee_id ? <Badge variant="outline">{user.employee_id}</Badge> : null}
                                   {user.department ? <Badge variant="outline">{user.department}</Badge> : null}
                                   {user.position ? <Badge variant="outline">{user.position}</Badge> : null}
                                 </div>
                               </div>
                               <div className="w-full lg:w-72">
-                                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Base Template</label>
+                                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Base Template</label>
                                 <select
                                   value={user.template ?? ""}
                                   onChange={(event) => updateUserTemplate(user.id, event.target.value)}
-                                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100"
                                 >
                                   {templates.map((template) => (
                                     <option key={template.key} value={template.key}>{template.label}</option>
@@ -414,16 +414,16 @@ export default function AdminFacultyRbacPage() {
                           <CardContent className="space-y-4">
                             <div className="grid gap-3 lg:grid-cols-2">
                               {permissions.map((permission) => (
-                                <div key={`${user.id}-${permission.key}`} className="rounded-lg border border-slate-200 p-3">
+                                <div key={`${user.id}-${permission.key}`} className="rounded-lg border border-slate-200 p-3 dark:border-white/15">
                                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                      <p className="text-sm font-medium text-slate-900">{permission.label}</p>
-                                      <p className="text-xs text-slate-500">{permission.description}</p>
+                                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{permission.label}</p>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">{permission.description}</p>
                                     </div>
                                     <select
                                       value={overrideMap[permission.key] ?? "default"}
                                       onChange={(event) => updateUserOverride(user.id, permission.key, event.target.value)}
-                                      className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                                      className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-white/15 dark:bg-slate-900 dark:text-slate-100"
                                     >
                                       {OVERRIDE_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -433,8 +433,8 @@ export default function AdminFacultyRbacPage() {
                                 </div>
                               ))}
                             </div>
-                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Effective Permissions</p>
+                            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 dark:border-white/20 dark:bg-white/5">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Effective Permissions</p>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {user.effective_permissions.map((permission) => (
                                   <Badge key={`${user.id}-effective-${permission}`} variant="secondary">{permission}</Badge>
@@ -450,7 +450,7 @@ export default function AdminFacultyRbacPage() {
                     })}
                     {filteredUsers.length === 0 ? (
                       <Card>
-                        <CardContent className="p-6 text-sm text-slate-500">No faculty users matched your search.</CardContent>
+                        <CardContent className="p-6 text-sm text-slate-500 dark:text-slate-400">No faculty users matched your search.</CardContent>
                       </Card>
                     ) : null}
                   </div>
@@ -463,4 +463,3 @@ export default function AdminFacultyRbacPage() {
     </div>
   );
 }
-

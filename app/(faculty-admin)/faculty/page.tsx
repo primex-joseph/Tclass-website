@@ -205,19 +205,23 @@ function SidebarNavItem({
 
 // ─── Live Clock ───────────────────────────────────────────────────────────────
 function LiveClock() {
-  const [now, setNow] = useState<Date>(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const dateStr = now.toLocaleDateString("en-PH", {
-    weekday: "short", year: "numeric", month: "short", day: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("en-PH", {
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
+  const dateStr = now
+    ? now.toLocaleDateString("en-PH", {
+        weekday: "short", year: "numeric", month: "short", day: "numeric",
+      })
+    : "---";
+  const timeStr = now
+    ? now.toLocaleTimeString("en-PH", {
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      })
+    : "--:--:--";
 
   return (
     <div className="hidden flex-col items-end text-right md:flex">
