@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -40,7 +40,7 @@ import {
   type FacultyScheduleMastersPayload,
   type FacultySchedulePayload,
 } from "./faculty-portal-cache";
-import { DisclaimerBanner, AyTermRow } from "./shared-ui";
+import { AyTermRow } from "./shared-ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DAY_LABELS: Record<string, string> = {
@@ -74,6 +74,22 @@ type ScheduleItem = NonNullable<FacultySchedulePayload["items"]>[number];
 type RosterItem = NonNullable<FacultyOfferingRosterPayload["items"]>[number];
 type CandidateItem = NonNullable<FacultyOfferingStudentSearchPayload["items"]>[number];
 type RoomAvailabilityItem = NonNullable<FacultyScheduleRoomAvailabilityPayload["items"]>[number];
+type SidebarSlot = {
+  offering_id: number;
+  period_id: number;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  room_id: number | null;
+};
+
+const EVENT_DROP_HIGHLIGHT_CLASSES = [
+  "ring-2",
+  "ring-cyan-500",
+  "ring-offset-2",
+  "ring-offset-white",
+  "dark:ring-offset-slate-900",
+];
 
 function trimSeconds(value: string) {
   return value.slice(0, 5);
@@ -118,6 +134,14 @@ export function ClassSchedulesSection() {
   const [roomAvailabilityItems, setRoomAvailabilityItems] = useState<RoomAvailabilityItem[]>([]);
   const [roomAvailabilityLoading, setRoomAvailabilityLoading] = useState(false);
   const [roomAvailabilityHasSlot, setRoomAvailabilityHasSlot] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarSlot, setSidebarSlot] = useState<SidebarSlot | null>(null);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [sidebarSearchDebounced, setSidebarSearchDebounced] = useState("");
+  const [sidebarItems, setSidebarItems] = useState<RoomAvailabilityItem[]>([]);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
+  const [sidebarHasSlot, setSidebarHasSlot] = useState(false);
+  const [draggingRoomId, setDraggingRoomId] = useState<number | null>(null);
 
   const [rosterLoading, setRosterLoading] = useState(false);
   const [rosterItems, setRosterItems] = useState<RosterItem[]>([]);
@@ -126,6 +150,17 @@ export function ClassSchedulesSection() {
   const [candidates, setCandidates] = useState<CandidateItem[]>([]);
   const [busyEnrollmentId, setBusyEnrollmentId] = useState<number | null>(null);
   const [addingStudentId, setAddingStudentId] = useState<number | null>(null);
+  const dragRoomIdRef = useRef<number | null>(null);
+  const eventDropHandlersRef = useRef(
+    new Map<
+      HTMLElement,
+      {
+        onDragOver: (event: DragEvent) => void;
+        onDragLeave: (event: DragEvent) => void;
+        onDrop: (event: DragEvent) => void;
+      }
+    >()
+  );
 
   const selectedPeriod = periods?.find((period) => String(period.id) === selectedPeriodId);
 
@@ -139,6 +174,7 @@ export function ClassSchedulesSection() {
       setItems(payload.items ?? []);
       setCanManage(Boolean(payload.can_manage));
       setCanExport(Boolean(payload.can_export));
+      return payload.items ?? [];
     },
     [teacherFilter]
   );
@@ -179,6 +215,30 @@ export function ClassSchedulesSection() {
         toast.error(error instanceof Error ? error.message : "Failed to load room availability.");
       } finally {
         setRoomAvailabilityLoading(false);
+      }
+    },
+    []
+  );
+
+  const loadSidebarAvailability = useCallback(
+    async (slot: SidebarSlot | null, search: string) => {
+      setSidebarLoading(true);
+      try {
+        const payload = await getFacultyClassScheduleRoomAvailability({
+          period_id: slot?.period_id,
+          day_of_week: slot?.day_of_week,
+          start_time: slot?.start_time,
+          end_time: slot?.end_time,
+          search: search || undefined,
+          active_only: true,
+          exclude_offering_id: slot?.offering_id,
+        });
+        setSidebarHasSlot(Boolean(payload.has_slot));
+        setSidebarItems(payload.items ?? []);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to load room sidebar.");
+      } finally {
+        setSidebarLoading(false);
       }
     },
     []
@@ -236,8 +296,46 @@ export function ClassSchedulesSection() {
   const refreshCurrentSchedule = useCallback(async () => {
     if (!selectedPeriodId) return;
     clearFacultyPeriodCache(Number(selectedPeriodId));
-    await loadScheduleRows(Number(selectedPeriodId), true);
+    return loadScheduleRows(Number(selectedPeriodId), true);
   }, [loadScheduleRows, selectedPeriodId]);
+
+  useEffect(() => {
+    dragRoomIdRef.current = draggingRoomId;
+  }, [draggingRoomId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSidebarSearchDebounced(sidebarSearch.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [sidebarSearch]);
+
+  const toSidebarSlot = useCallback((item: ScheduleItem): SidebarSlot => {
+    return {
+      offering_id: item.offering_id,
+      period_id: item.period_id,
+      day_of_week: item.day_of_week,
+      start_time: trimSeconds(item.start_time),
+      end_time: trimSeconds(item.end_time),
+      room_id: item.room_id ?? null,
+    };
+  }, []);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setSidebarSlot(null);
+      return;
+    }
+    setSidebarSlot((prev) => {
+      if (!prev) {
+        return toSidebarSlot(items[0]);
+      }
+      const matched = items.find((item) => item.offering_id === prev.offering_id);
+      return matched ? toSidebarSlot(matched) : toSidebarSlot(items[0]);
+    });
+  }, [items, toSidebarSlot]);
+
+  useEffect(() => {
+    void loadSidebarAvailability(sidebarSlot, sidebarSearchDebounced);
+  }, [loadSidebarAvailability, sidebarSearchDebounced, sidebarSlot]);
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -292,8 +390,9 @@ export function ClassSchedulesSection() {
         end_time: trimSeconds(item.end_time),
         exclude_offering_id: item.offering_id,
       });
+      setSidebarSlot(toSidebarSlot(item));
     },
-    [canManage, loadRoomAvailability, loadRoster]
+    [canManage, loadRoomAvailability, loadRoster, toSidebarSlot]
   );
 
   const handleDragUpdate = async (
@@ -329,12 +428,117 @@ export function ClassSchedulesSection() {
         section_id: item.section_id ?? null,
       });
       await refreshCurrentSchedule();
+      setSidebarSlot(toSidebarSlot({ ...item, day_of_week: nextDay, start_time: `${toTimeValue(start)}:00`, end_time: `${toTimeValue(end)}:00` }));
       toast.success("Schedule updated.");
     } catch (error) {
       action.revert();
       toast.error(error instanceof Error ? error.message : "Failed to move schedule.");
     }
   };
+
+  const suggestNearestRoom = useCallback(
+    async (item: ScheduleItem, requestedRoomId: number) => {
+      const requestedRoom = rooms.find((room) => room.id === requestedRoomId);
+      const requestedBuilding = (requestedRoom?.building ?? "").trim().toLowerCase();
+      const payload = await getFacultyClassScheduleRoomAvailability({
+        period_id: item.period_id,
+        day_of_week: item.day_of_week,
+        start_time: trimSeconds(item.start_time),
+        end_time: trimSeconds(item.end_time),
+        active_only: true,
+        exclude_offering_id: item.offering_id,
+      });
+      setSidebarHasSlot(Boolean(payload.has_slot));
+      setSidebarItems(payload.items ?? []);
+      const available = (payload.items ?? []).filter((entry) => entry.is_available);
+      if (available.length === 0) return null;
+      const sorted = [...available].sort((a, b) => {
+        const aBuilding = (a.building ?? "").trim().toLowerCase();
+        const bBuilding = (b.building ?? "").trim().toLowerCase();
+        const aPriority = requestedBuilding && aBuilding === requestedBuilding ? 0 : 1;
+        const bPriority = requestedBuilding && bBuilding === requestedBuilding ? 0 : 1;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.room_code.localeCompare(b.room_code);
+      });
+      return sorted[0] ?? null;
+    },
+    [rooms]
+  );
+
+  const clearEventDropHighlight = useCallback((element: HTMLElement) => {
+    for (const className of EVENT_DROP_HIGHLIGHT_CLASSES) {
+      element.classList.remove(className);
+    }
+  }, []);
+
+  const clearAllEventDropHighlights = useCallback(() => {
+    for (const element of eventDropHandlersRef.current.keys()) {
+      clearEventDropHighlight(element);
+    }
+  }, [clearEventDropHighlight]);
+
+  const handleRoomDropOnEvent = useCallback(
+    async (roomId: number, item: ScheduleItem) => {
+      if (!canManage) return;
+      if (item.room_id === roomId) {
+        toast("Room already assigned to this schedule.");
+        setSidebarSlot(toSidebarSlot(item));
+        return;
+      }
+      const targetRoom = rooms.find((entry) => entry.id === roomId);
+      if (!targetRoom) {
+        toast.error("Selected room is no longer available.");
+        return;
+      }
+
+      setSidebarSlot(toSidebarSlot(item));
+      try {
+        await updateFacultySchedule(item.offering_id, {
+          day_of_week: item.day_of_week,
+          start_time: trimSeconds(item.start_time),
+          end_time: trimSeconds(item.end_time),
+          teacher_id: item.teacher_id ?? null,
+          room_id: roomId,
+          section_id: item.section_id ?? null,
+        });
+        const refreshed = await refreshCurrentSchedule();
+        if (selectedItem?.offering_id === item.offering_id) {
+          setScheduleForm((prev) => ({ ...prev, room_id: String(roomId) }));
+          const updated = refreshed?.find((entry) => entry.offering_id === item.offering_id) ?? null;
+          if (updated) {
+            setSelectedItem(updated);
+          }
+        }
+        await loadSidebarAvailability(
+          {
+            ...toSidebarSlot(item),
+            room_id: roomId,
+          },
+          sidebarSearchDebounced
+        );
+        toast.success(`Room changed to ${targetRoom.room_code}.`);
+      } catch (error) {
+        const suggestion = await suggestNearestRoom(item, roomId).catch(() => null);
+        const baseMessage = error instanceof Error ? error.message : "Failed to update room assignment.";
+        if (suggestion) {
+          const buildingSuffix = suggestion.building ? ` (${suggestion.building})` : "";
+          toast.error(`${baseMessage} Suggested room: ${suggestion.room_code}${buildingSuffix}.`);
+        } else {
+          toast.error(baseMessage);
+        }
+      }
+    },
+    [
+      canManage,
+      loadSidebarAvailability,
+      refreshCurrentSchedule,
+      rooms,
+      selectedItem?.offering_id,
+      sidebarSearchDebounced,
+      suggestNearestRoom,
+      toSidebarSlot,
+    ]
+  );
 
   const handleSaveSchedule = async () => {
     if (!selectedItem) return;
@@ -353,9 +557,9 @@ export function ClassSchedulesSection() {
         room_id: Number(scheduleForm.room_id),
         section_id: Number(scheduleForm.section_id),
       });
-      await refreshCurrentSchedule();
+      const refreshed = await refreshCurrentSchedule();
       clearFacultyRosterCache(selectedItem.offering_id);
-      const updated = items.find((item) => item.offering_id === selectedItem.offering_id);
+      const updated = refreshed?.find((item) => item.offering_id === selectedItem.offering_id);
       if (updated) {
         setSelectedItem(updated);
       }
@@ -465,6 +669,11 @@ export function ClassSchedulesSection() {
     [items]
   );
 
+  const sidebarSelectedRoom = useMemo(() => {
+    if (!sidebarSlot?.room_id) return null;
+    return rooms.find((room) => room.id === sidebarSlot.room_id) ?? null;
+  }, [rooms, sidebarSlot?.room_id]);
+
   const selectedRoomAvailability = useMemo(() => {
     const roomId = scheduleForm.room_id ? Number(scheduleForm.room_id) : null;
     if (!roomId) return null;
@@ -480,7 +689,6 @@ export function ClassSchedulesSection() {
         </p>
       </div>
 
-      <DisclaimerBanner text="DISCLAIMER: Registrar-level faculty can drag, resize, and manage subject rosters in this calendar." />
       <AyTermRow
         value={selectedPeriodId}
         onChange={setSelectedPeriodId}
@@ -514,54 +722,226 @@ export function ClassSchedulesSection() {
         </div>
       ) : null}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
-        {loading ? (
-          <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Loading calendar...</p>
-        ) : null}
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
-          height="auto"
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,timeGridDay",
-          }}
-          buttonText={{
-            today: "Today",
-            month: "Month",
-            week: "Week",
-            day: "Day",
-          }}
-          editable={canManage}
-          eventStartEditable={canManage}
-          eventDurationEditable={canManage}
-          eventAllow={(dropInfo) => dropInfo.start.getDay() !== 0}
-          events={events}
-          slotMinTime="07:00:00"
-          slotMaxTime="22:00:00"
-          allDaySlot={false}
-          eventClick={(info: EventClickArg) => {
-            const item = info.event.extendedProps.item as ScheduleItem | undefined;
-            if (!item) return;
-            void openSubjectModal(item);
-          }}
-          eventDrop={(info: EventDropArg) => {
-            const item = info.event.extendedProps.item as ScheduleItem | undefined;
-            if (!item) return;
-            void handleDragUpdate(info, item);
-          }}
-          eventResize={(info: EventResizeDoneArg) => {
-            const item = info.event.extendedProps.item as ScheduleItem | undefined;
-            if (!item) return;
-            void handleDragUpdate(info, item);
-          }}
-        />
-        {!loading && items.length === 0 ? (
-          <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-white/20 dark:bg-white/5 dark:text-slate-300">
-            No schedule entries yet for this period. Calendar stays visible so registrar can start planning.
+      <div
+        className={`grid gap-4 ${sidebarOpen ? "xl:grid-cols-[minmax(0,1fr)_320px]" : "xl:grid-cols-[minmax(0,1fr)_76px]"}`}
+      >
+        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
+          {loading ? (
+            <p className="mb-2 text-sm text-slate-500 dark:text-slate-400">Loading calendar...</p>
+          ) : null}
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            height="auto"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek,timeGridDay",
+            }}
+            buttonText={{
+              today: "Today",
+              month: "Month",
+              week: "Week",
+              day: "Day",
+            }}
+            editable={canManage}
+            eventStartEditable={canManage}
+            eventDurationEditable={canManage}
+            eventAllow={(dropInfo) => dropInfo.start.getDay() !== 0}
+            events={events}
+            slotMinTime="07:00:00"
+            slotMaxTime="22:00:00"
+            allDaySlot={false}
+            eventClick={(info: EventClickArg) => {
+              const item = info.event.extendedProps.item as ScheduleItem | undefined;
+              if (!item) return;
+              setSidebarSlot((prev) => {
+                if (prev?.offering_id === item.offering_id) return prev;
+                return toSidebarSlot(item);
+              });
+              void openSubjectModal(item);
+            }}
+            eventMouseEnter={(info) => {
+              const item = info.event.extendedProps.item as ScheduleItem | undefined;
+              if (!item) return;
+              setSidebarSlot((prev) => {
+                if (prev?.offering_id === item.offering_id) return prev;
+                return toSidebarSlot(item);
+              });
+            }}
+            eventDidMount={(info) => {
+              if (!canManage) return;
+              const item = info.event.extendedProps.item as ScheduleItem | undefined;
+              if (!item) return;
+              const element = info.el as HTMLElement;
+              const onDragOver = (event: DragEvent) => {
+                if (!dragRoomIdRef.current) return;
+                event.preventDefault();
+                if (event.dataTransfer) {
+                  event.dataTransfer.dropEffect = "move";
+                }
+                for (const className of EVENT_DROP_HIGHLIGHT_CLASSES) {
+                  element.classList.add(className);
+                }
+                setSidebarSlot((prev) => {
+                  if (prev?.offering_id === item.offering_id) return prev;
+                  return toSidebarSlot(item);
+                });
+              };
+              const onDragLeave = (event: DragEvent) => {
+                if (event.relatedTarget instanceof Node && element.contains(event.relatedTarget)) return;
+                clearEventDropHighlight(element);
+              };
+              const onDrop = (event: DragEvent) => {
+                clearEventDropHighlight(element);
+                if (!dragRoomIdRef.current) return;
+                event.preventDefault();
+                const payloadRoomId = event.dataTransfer?.getData("application/x-room-id")
+                  || event.dataTransfer?.getData("text/plain");
+                const roomId = Number(payloadRoomId || dragRoomIdRef.current);
+                if (!Number.isInteger(roomId) || roomId <= 0) return;
+                setDraggingRoomId(null);
+                dragRoomIdRef.current = null;
+                clearAllEventDropHighlights();
+                void handleRoomDropOnEvent(roomId, item);
+              };
+              element.addEventListener("dragover", onDragOver);
+              element.addEventListener("dragleave", onDragLeave);
+              element.addEventListener("drop", onDrop);
+              eventDropHandlersRef.current.set(element, { onDragOver, onDragLeave, onDrop });
+            }}
+            eventWillUnmount={(info) => {
+              const element = info.el as HTMLElement;
+              const handlers = eventDropHandlersRef.current.get(element);
+              if (!handlers) return;
+              element.removeEventListener("dragover", handlers.onDragOver);
+              element.removeEventListener("dragleave", handlers.onDragLeave);
+              element.removeEventListener("drop", handlers.onDrop);
+              clearEventDropHighlight(element);
+              eventDropHandlersRef.current.delete(element);
+            }}
+            eventDrop={(info: EventDropArg) => {
+              const item = info.event.extendedProps.item as ScheduleItem | undefined;
+              if (!item) return;
+              void handleDragUpdate(info, item);
+            }}
+            eventResize={(info: EventResizeDoneArg) => {
+              const item = info.event.extendedProps.item as ScheduleItem | undefined;
+              if (!item) return;
+              void handleDragUpdate(info, item);
+            }}
+          />
+          {!loading && items.length === 0 ? (
+            <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-white/20 dark:bg-white/5 dark:text-slate-300">
+              No schedule entries yet for this period. Calendar stays visible so registrar can start planning.
+            </div>
+          ) : null}
+        </div>
+
+        <aside className="hidden rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-slate-900 xl:block">
+          <div className="flex items-center justify-between gap-2">
+            {sidebarOpen ? (
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Room Sidebar</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {canManage ? "Drag room cards onto a class block." : "Room occupancy context (view only)."}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Rooms</p>
+            )}
+            <Button type="button" size="sm" variant="outline" onClick={() => setSidebarOpen((prev) => !prev)}>
+              {sidebarOpen ? "Collapse" : "Open"}
+            </Button>
           </div>
-        ) : null}
+
+          {sidebarOpen ? (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-white/10 dark:bg-white/5">
+                {sidebarSlot ? (
+                  <>
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      {sidebarSlot.day_of_week} {sidebarSlot.start_time}-{sidebarSlot.end_time}
+                    </p>
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Current room: {sidebarSelectedRoom?.room_code || "Unassigned"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-slate-500 dark:text-slate-400">
+                    Hover or click a class event to target a slot for room availability.
+                  </p>
+                )}
+              </div>
+              <Input
+                value={sidebarSearch}
+                onChange={(event) => setSidebarSearch(event.target.value)}
+                placeholder="Search room or building"
+              />
+              <div className="max-h-[620px] space-y-2 overflow-y-auto">
+                {sidebarLoading ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading room availability...</p>
+                ) : !sidebarHasSlot ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Select an event to evaluate occupancy.</p>
+                ) : sidebarItems.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No rooms matched this filter.</p>
+                ) : (
+                  sidebarItems.map((room) => (
+                    <div
+                      key={room.room_id}
+                      draggable={canManage}
+                      onDragStart={(event) => {
+                        if (!canManage) return;
+                        setDraggingRoomId(room.room_id);
+                        dragRoomIdRef.current = room.room_id;
+                        event.dataTransfer.setData("application/x-room-id", String(room.room_id));
+                        event.dataTransfer.setData("text/plain", String(room.room_id));
+                        event.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragEnd={() => {
+                        setDraggingRoomId(null);
+                        dragRoomIdRef.current = null;
+                        clearAllEventDropHighlights();
+                      }}
+                      className={`rounded-md border px-3 py-2 ${
+                        room.is_available
+                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/20"
+                          : "border-rose-300 bg-rose-50 dark:border-rose-500/40 dark:bg-rose-950/20"
+                      } ${canManage ? "cursor-grab active:cursor-grabbing" : "cursor-default"} ${
+                        draggingRoomId === room.room_id ? "opacity-70" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">{room.room_code}</p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {[room.title, room.building, room.capacity ? `${room.capacity} seats` : null].filter(Boolean).join(" | ")}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            room.is_available
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
+                              : "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-200"
+                          }`}
+                        >
+                          {room.is_available ? "Open" : "Occupied"}
+                        </span>
+                      </div>
+                      {room.warnings?.length ? (
+                        <p className="mt-1 text-[11px] text-rose-700 dark:text-rose-300">{room.warnings[0]}</p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          {canManage ? "Drag onto an event to assign this room." : "No overlap for this slot."}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </aside>
       </div>
 
       <Dialog
@@ -928,4 +1308,3 @@ export function ClassSchedulesSection() {
     </div>
   );
 }
-

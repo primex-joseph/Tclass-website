@@ -74,6 +74,13 @@ const iconMap: Record<string, LucideIcon> = {
   "graduation-cap": GraduationCap,
 };
 
+const formatIconLabel = (key: string) =>
+  key
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 const emptyForm = {
   room_code: "",
   title: "",
@@ -101,6 +108,7 @@ export default function AdminRoomsPage() {
   const [presets, setPresets] = useState<string[]>(Object.keys(iconMap));
   const [availability, setAvailability] = useState<Map<number, Availability>>(new Map());
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
   const [search, setSearch] = useState("");
@@ -145,13 +153,14 @@ export default function AdminRoomsPage() {
       const items = payload.items ?? [];
       setRooms(items);
       if ((payload.room_icon_presets ?? []).length) setPresets(payload.room_icon_presets ?? []);
+      if (isCreating) return;
       if (!selectedId || !items.some((r) => r.id === selectedId)) setSelectedId(items[0]?.id ?? null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load rooms.");
     } finally {
       setLoading(false);
     }
-  }, [building, debouncedSearch, selectedId, status]);
+  }, [building, debouncedSearch, isCreating, selectedId, status]);
 
   const loadAvailability = useCallback(async () => {
     const qs = new URLSearchParams();
@@ -205,6 +214,7 @@ export default function AdminRoomsPage() {
   }, [presets, rooms, selectedId]);
 
   const selectedRoom = useMemo(() => rooms.find((x) => x.id === selectedId) ?? null, [rooms, selectedId]);
+  const SelectedFormIcon = iconMap[form.icon_key ?? ""] ?? Building2;
 
   const saveRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -221,8 +231,14 @@ export default function AdminRoomsPage() {
       };
       if (selectedId) {
         await apiFetch(`/admin/scheduling/rooms/${selectedId}`, { method: "PATCH", body: JSON.stringify(payload) });
+        setIsCreating(false);
       } else {
-        await apiFetch("/admin/scheduling/rooms", { method: "POST", body: JSON.stringify(payload) });
+        const created = (await apiFetch("/admin/scheduling/rooms", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })) as { item?: { id?: number } };
+        setSelectedId(created.item?.id ?? null);
+        setIsCreating(false);
       }
       toast.success("Room saved.");
       await Promise.all([loadRooms(), loadAvailability()]);
@@ -256,6 +272,7 @@ export default function AdminRoomsPage() {
       });
       toast.success("Room deleted.");
       setDeleteOpen(false);
+      setIsCreating(false);
       setSelectedId(null);
       await Promise.all([loadRooms(), loadAvailability()]);
     } catch (error) {
@@ -264,6 +281,7 @@ export default function AdminRoomsPage() {
   };
 
   const resetNew = () => {
+    setIsCreating(true);
     setSelectedId(null);
     setForm((prev) => ({ ...emptyForm, icon_key: presets[0] ?? prev.icon_key }));
   };
@@ -314,7 +332,10 @@ export default function AdminRoomsPage() {
                   const Icon = iconMap[room.icon_key ?? ""] ?? Building2;
                   const slot = availability.get(room.id);
                   return (
-                    <button key={room.id} type="button" onClick={() => setSelectedId(room.id)} className={`w-full rounded-lg border p-3 text-left ${selectedId === room.id ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-white/10"}`}>
+                    <button key={room.id} type="button" onClick={() => {
+                      setIsCreating(false);
+                      setSelectedId(room.id);
+                    }} className={`w-full rounded-lg border p-3 text-left ${selectedId === room.id && !isCreating ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-white/10"}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2"><Icon className="mt-0.5 h-4 w-4 text-slate-600 dark:text-slate-300" /><div><p className="font-semibold">{room.room_code}</p><p className="text-xs text-slate-500">{room.title || "Untitled"} | {room.building || "-"} | {room.capacity || 0} seats</p></div></div>
                         <div className="flex flex-col items-end gap-1"><Badge variant={Boolean(room.is_active) ? "secondary" : "outline"}>{Boolean(room.is_active) ? "Active" : "Inactive"}</Badge>{slot ? <Badge variant={slot.is_available ? "secondary" : "destructive"}>{slot.is_available ? "Open" : "Blocked"}</Badge> : null}</div>
@@ -329,14 +350,38 @@ export default function AdminRoomsPage() {
 
             <div className="space-y-4">
               <Card>
-                <CardHeader><CardTitle>{selectedId ? "Edit Room" : "Create Room"}</CardTitle><CardDescription>Icon + title + description with audit attribution.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>{selectedId && !isCreating ? "Edit Room" : "Create Room"}</CardTitle><CardDescription>Icon + title + description with audit attribution.</CardDescription></CardHeader>
                 <CardContent>
                   <form className="space-y-3" onSubmit={saveRoom}>
                     <div className="grid gap-2 md:grid-cols-2"><div><Label>Room Code</Label><Input required value={form.room_code} onChange={(event) => setForm((prev) => ({ ...prev, room_code: event.target.value.toUpperCase() }))} /></div><div><Label>Title</Label><Input required value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} /></div></div>
                     <div className="grid gap-2 md:grid-cols-3"><div><Label>Building</Label><Input value={form.building} onChange={(event) => setForm((prev) => ({ ...prev, building: event.target.value }))} /></div><div><Label>Capacity</Label><Input type="number" value={form.capacity} onChange={(event) => setForm((prev) => ({ ...prev, capacity: event.target.value }))} /></div><div><Label>Status</Label><Select value={form.is_active ? "active" : "inactive"} onValueChange={(value) => setForm((prev) => ({ ...prev, is_active: value === "active" }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div></div>
-                    <div><Label>Icon</Label><Select value={form.icon_key} onValueChange={(value) => setForm((prev) => ({ ...prev, icon_key: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{presets.map((key) => <SelectItem key={key} value={key}>{key}</SelectItem>)}</SelectContent></Select></div>
+                    <div>
+                      <Label>Icon</Label>
+                      <Select value={form.icon_key} onValueChange={(value) => setForm((prev) => ({ ...prev, icon_key: value }))}>
+                        <SelectTrigger>
+                          <div className="flex items-center gap-2">
+                            <SelectedFormIcon className="h-4 w-4 text-slate-500" />
+                            <span>{formatIconLabel(form.icon_key || "building-2")}</span>
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {presets.map((key) => {
+                            const Icon = iconMap[key] ?? Building2;
+                            return (
+                              <SelectItem key={key} value={key}>
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4 text-slate-500" />
+                                  <span>{formatIconLabel(key)}</span>
+                                  <span className="text-xs text-slate-400">{key}</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div><Label>Description</Label><Textarea value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} /></div>
-                    <div className="flex gap-2"><Button type="submit" disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Room"}</Button>{selectedId ? <Button type="button" variant="destructive" onClick={() => void previewDelete()}><Trash2 className="mr-2 h-4 w-4" />Delete</Button> : null}</div>
+                    <div className="flex gap-2"><Button type="submit" disabled={saving}><Save className="mr-2 h-4 w-4" />{saving ? "Saving..." : "Save Room"}</Button>{selectedId && !isCreating ? <Button type="button" variant="destructive" onClick={() => void previewDelete()}><Trash2 className="mr-2 h-4 w-4" />Delete</Button> : null}</div>
                   </form>
                 </CardContent>
               </Card>
