@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import Image from "next/image";
 import {
@@ -542,6 +543,14 @@ export default function FacultyPage() {
             onToggleGroup={toggleGroup}
           />
         ))}
+        <Link
+          href="/faculty/quizzes"
+          className="mt-2 flex w-full items-center gap-3 rounded-xl border border-blue-200/80 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          Online Quizzes
+        </Link>
       </nav>
 
       {/* Footer */}

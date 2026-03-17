@@ -937,15 +937,15 @@
   background: var(--oc-handle-bg);
 }
 
-:global(.react-flow__edge-path) {
+.reactFlow :global(.react-flow__edge-path) {
   stroke-linecap: round;
 }
 
-:global(.react-flow__controls) {
+.reactFlow :global(.react-flow__controls) {
   display: none;
 }
 
-:global(.react-flow__attribution) {
+.reactFlow :global(.react-flow__attribution) {
   display: none;
 }
 

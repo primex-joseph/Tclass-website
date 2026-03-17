@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: "/faculty/classes", label: "My Classes" },
   { href: "/faculty/students", label: "Students" },
   { href: "/faculty/assignments", label: "Assignments" },
+  { href: "/faculty/quizzes", label: "Quizzes" },
   { href: "/faculty/grades", label: "Grades" },
 ];
 
