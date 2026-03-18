@@ -110,6 +110,7 @@ export function StudentQuizLinkPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AttemptSubmitResponse | null>(null);
   const [finalRemainingSeconds, setFinalRemainingSeconds] = useState<number | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [clockTick, setClockTick] = useState(Date.now());
   const autoSubmitRef = useRef(false);
   const sessionRole = (sessionUser?.role ?? "").trim().toLowerCase();
@@ -366,9 +367,9 @@ export function StudentQuizLinkPage() {
                     Start Quiz
                   </Button>
                 ) : null}
-                {started && !result ? (
+                {started && !result && answeredCount === questions.length ? (
                   <Button type="button" onClick={() => void submitAttempt(false)} disabled={submitting}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                     Submit Quiz
                   </Button>
                 ) : null}
@@ -453,58 +454,155 @@ export function StudentQuizLinkPage() {
           ) : null}
 
           <div className="space-y-4">
-            {questions.map((question, index) => {
-              const answerKey = String(question.id);
-              return (
-                <Card key={question.id || index}>
-                  <CardHeader>
-                    <CardTitle className="text-base">
-                      {index + 1}. {question.prompt}
-                    </CardTitle>
-                    <CardDescription>{question.points} point(s)</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {question.choices.length > 0 ? (
-                      <div className="space-y-2">
-                        {question.choices.map((choice) => (
-                          <label
-                            key={`${question.id}-${choice.id}`}
-                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/15"
-                          >
-                            <input
-                              type="radio"
-                              name={`question-${question.id}`}
-                              value={choice.id}
-                              checked={answers[answerKey] === choice.id}
-                              disabled={!started || Boolean(result)}
-                              onChange={(event) =>
-                                setAnswers((prev) => ({
-                                  ...prev,
-                                  [answerKey]: event.target.value,
-                                }))
-                              }
-                            />
-                            <span>{choice.text}</span>
-                          </label>
-                        ))}
+            {started && !result && questions.length > 0 ? (
+              (() => {
+                const currentQuestion = questions[currentQuestionIndex];
+                if (!currentQuestion) return null;
+                const answerKey = String(currentQuestion.id);
+                const currentAnswer = answers[answerKey] ?? "";
+                const hasAnsweredCurrent = currentAnswer.trim() !== "";
+                const isLastQuestion = currentQuestionIndex === questions.length - 1;
+
+                return (
+                  <Card key={currentQuestion.id}>
+                    <CardHeader>
+                      <div className="mb-2 flex items-center justify-between">
+                        <Badge variant="secondary" className="px-3 py-1 text-sm font-medium">
+                          Question {currentQuestionIndex + 1} of {questions.length}
+                        </Badge>
                       </div>
-                    ) : (
-                      <Textarea
-                        value={answers[answerKey] ?? ""}
-                        disabled={!started || Boolean(result)}
-                        onChange={(event) =>
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [answerKey]: event.target.value,
-                          }))
-                        }
-                        placeholder="Type your answer..."
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                      <CardTitle className="text-xl">
+                        {currentQuestionIndex + 1}. {currentQuestion.prompt}
+                      </CardTitle>
+                      <CardDescription>{currentQuestion.points} point(s)</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {currentQuestion.choices.length > 0 ? (
+                        <div className="space-y-3">
+                          {currentQuestion.choices.map((choice) => (
+                            <label
+                              key={`${currentQuestion.id}-${choice.id}`}
+                              className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4 transition-colors hover:bg-slate-50 dark:border-white/10 dark:hover:bg-slate-800/50"
+                            >
+                              <input
+                                type="radio"
+                                className="h-4 w-4"
+                                name={`question-${currentQuestion.id}`}
+                                value={choice.id}
+                                checked={answers[answerKey] === choice.id}
+                                disabled={submitting}
+                                onChange={(event) =>
+                                  setAnswers((prev) => ({
+                                    ...prev,
+                                    [answerKey]: event.target.value,
+                                  }))
+                                }
+                              />
+                              <span className="text-base">{choice.text}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <Textarea
+                          className="min-h-[120px] text-base"
+                          value={currentAnswer}
+                          disabled={submitting}
+                          onChange={(event) =>
+                            setAnswers((prev) => ({
+                              ...prev,
+                              [answerKey]: event.target.value,
+                            }))
+                          }
+                          placeholder="Type your answer here..."
+                        />
+                      )}
+                    </CardContent>
+                    <div className="flex items-center justify-between rounded-b-xl border-t border-slate-100 bg-slate-50/50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/20">
+                      <div>
+                        {currentQuestionIndex > 0 ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => setCurrentQuestionIndex((p) => p - 1)}
+                            disabled={submitting}
+                          >
+                            Previous
+                          </Button>
+                        ) : (
+                          <div />
+                        )}
+                      </div>
+                      <div>
+                        {!isLastQuestion ? (
+                          <Button
+                            onClick={() => setCurrentQuestionIndex((p) => p + 1)}
+                            disabled={!hasAnsweredCurrent}
+                          >
+                            Next
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => void submitAttempt(false)}
+                            disabled={!hasAnsweredCurrent || submitting}
+                          >
+                            {submitting ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="mr-2 h-4 w-4" />
+                            )}
+                            Submit Quiz
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })()
+            ) : (
+              <>
+                {result &&
+                  !isEntranceResult &&
+                  questions.map((question, index) => {
+                    const answerKey = String(question.id);
+                    return (
+                      <Card key={question.id || index}>
+                        <CardHeader>
+                          <CardTitle className="text-base">
+                            {index + 1}. {question.prompt}
+                          </CardTitle>
+                          <CardDescription>{question.points} point(s)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {question.choices.length > 0 ? (
+                            <div className="space-y-2">
+                              {question.choices.map((choice) => (
+                                <label
+                                  key={`${question.id}-${choice.id}`}
+                                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/15"
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`question-${question.id}`}
+                                    value={choice.id}
+                                    checked={answers[answerKey] === choice.id}
+                                    disabled
+                                  />
+                                  <span>{choice.text}</span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : (
+                            <Textarea
+                              value={answers[answerKey] ?? ""}
+                              disabled
+                              placeholder="Type your answer..."
+                            />
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </>
+            )}
           </div>
         </main>
       </div>
