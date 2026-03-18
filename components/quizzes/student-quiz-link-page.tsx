@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, Clock3, Loader2, PlayCircle, Send } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, GraduationCap, Loader2, Mail, PlayCircle, Send } from "lucide-react";
 
 import {
   startStudentQuizAttempt,
@@ -59,6 +59,42 @@ function deriveLocalExpiry(quiz: QuizPlayable): number | null {
   return publishedMs + quiz.durationMinutes * 60 * 1000;
 }
 
+/* ────────────────────────────────────────────
+ * Minimal Navbar for Entrance Exam (logo + timer)
+ * ──────────────────────────────────────────── */
+function EntranceExamNavbar({ remainingSeconds, started }: { remainingSeconds: number; started: boolean }) {
+  const urgent = remainingSeconds <= 60;
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md dark:border-white/12 dark:bg-slate-950/95">
+      <div className="mx-auto max-w-[92rem] px-4 sm:px-6 lg:px-8">
+        <div className="flex h-14 items-center justify-between gap-4">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 p-1.5 shadow-md">
+              <GraduationCap className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-lg font-bold text-slate-900 dark:text-slate-100">TClass</span>
+            <span className="hidden sm:inline-flex text-[10px] rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-blue-700 dark:border-blue-300/30 dark:bg-blue-500/20 dark:text-blue-200">
+              Entrance Exam
+            </span>
+          </div>
+          {/* Timer */}
+          {started && (
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-bold tracking-wider transition-colors ${
+              urgent
+                ? "animate-pulse border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-300"
+                : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-300"
+            }`}>
+              <Clock3 className="h-4 w-4" />
+              {formatReadableTimer(remainingSeconds)}
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export function StudentQuizLinkPage() {
   const params = useParams();
   const token = asToken(params.token);
@@ -73,11 +109,13 @@ export function StudentQuizLinkPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AttemptSubmitResponse | null>(null);
+  const [finalRemainingSeconds, setFinalRemainingSeconds] = useState<number | null>(null);
   const [clockTick, setClockTick] = useState(Date.now());
   const autoSubmitRef = useRef(false);
   const sessionRole = (sessionUser?.role ?? "").trim().toLowerCase();
   const hasStudentSession = Boolean(sessionUser && sessionRole === "student");
   const loginHref = `/login?redirect=${encodeURIComponent(`/student/quizzes/${token}`)}`;
+  const isEntrance = quiz?.quizType === "entrance";
 
   const remainingSeconds = useMemo(() => {
     if (!started || !endsAt) return quiz?.durationMinutes ? quiz.durationMinutes * 60 : 0;
@@ -140,12 +178,14 @@ export function StudentQuizLinkPage() {
     async (autoSubmitted = false) => {
       if (!attemptId || submitting || result) return;
       setSubmitting(true);
+      const currentRemaining = remainingSeconds;
       try {
         const payload = await submitStudentQuizAttempt(attemptId, {
           answers,
           auto_submitted: autoSubmitted,
         });
         setResult(payload);
+        setFinalRemainingSeconds(currentRemaining);
         setStarted(false);
         toast.success(payload.message ?? (autoSubmitted ? "Time is up. Quiz auto-submitted." : "Quiz submitted."));
       } catch (error) {
@@ -186,6 +226,7 @@ export function StudentQuizLinkPage() {
       setStarted(true);
       setClockTick(Date.now());
       setResult(null);
+      setFinalRemainingSeconds(null);
       autoSubmitRef.current = false;
       await loadLinkState();
       toast.success("Quiz started.");
@@ -199,6 +240,10 @@ export function StudentQuizLinkPage() {
       setSubmitting(false);
     }
   };
+
+  /* ────────── ENTRANCE QUIZ: hide results ────────── */
+  const isEntranceResult = isEntrance && result;
+  const showScoreResult = result && !isEntrance;
 
   if (!sessionResolved) {
     return (
@@ -240,22 +285,25 @@ export function StudentQuizLinkPage() {
 
   if (linkState === "expired") {
     return (
-      <div className="mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-12">
-        <Card className="w-full border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-900/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
-              <AlertTriangle className="h-5 w-5" />
-              Link Expired
-            </CardTitle>
-            <CardDescription className="text-rose-700/90 dark:text-rose-300/90">
-              {message ?? "This quiz link is no longer accessible because the time window has ended."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-rose-700 dark:text-rose-300">
-            Contact your instructor or admin if you need a new quiz link.
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        {isEntrance && <EntranceExamNavbar remainingSeconds={0} started={false} />}
+        <div className={`mx-auto flex min-h-screen w-full max-w-2xl items-center px-4 py-12 ${isEntrance ? "pt-20" : ""}`}>
+          <Card className="w-full border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-900/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
+                <AlertTriangle className="h-5 w-5" />
+                Link Expired
+              </CardTitle>
+              <CardDescription className="text-rose-700/90 dark:text-rose-300/90">
+                {message ?? "This quiz link is no longer accessible because the time window has ended."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-rose-700 dark:text-rose-300">
+              Contact your instructor or admin if you need a new quiz link.
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
@@ -273,139 +321,193 @@ export function StudentQuizLinkPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">{quiz.title}</h1>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                {quiz.instructions || "Follow the instructions and submit before timer reaches 00:00."}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{quiz.passRate}% passing</Badge>
-              <Badge variant="outline">{quiz.durationMinutes} minutes</Badge>
+    <>
+      {/* For entrance quizzes: render minimal navbar instead of the full student nav */}
+      {isEntrance && <EntranceExamNavbar remainingSeconds={remainingSeconds} started={started} />}
+
+      <div className={`min-h-screen bg-slate-50 dark:bg-slate-950 ${isEntrance ? "pt-14" : ""}`}>
+        <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 sm:text-3xl">{quiz.title}</h1>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  {quiz.instructions || "Follow the instructions and submit before timer reaches 00:00."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{quiz.passRate}% passing</Badge>
+                <Badge variant="outline">{quiz.durationMinutes} minutes</Badge>
+              </div>
             </div>
           </div>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Attempt Status</CardTitle>
-            <CardDescription>{message ?? "Your quiz session is tracked in real-time."}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-900/25">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Remaining</p>
-              <p className="mt-1 text-4xl font-black tracking-wide text-blue-900 dark:text-blue-100 sm:text-5xl">{formatReadableTimer(remainingSeconds)}</p>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-              <Badge variant="outline" className="flex items-center gap-1.5">
-                <Clock3 className="h-3.5 w-3.5" />
-                {formatTimer(remainingSeconds)}
-              </Badge>
-              <Badge variant="outline">{answeredCount} answered</Badge>
-              </div>
-              {!started && !result ? (
-                <Button type="button" onClick={() => void handleStart()} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-                  Start Quiz
-                </Button>
-              ) : null}
-              {started && !result ? (
-                <Button type="button" onClick={() => void submitAttempt(false)} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Submit Quiz
-                </Button>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-
-        {result ? (
-          <Card className="border-blue-200 bg-blue-50/70 dark:border-blue-900/60 dark:bg-blue-900/20">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-blue-800 dark:text-blue-200">Submission Result</CardTitle>
-              <CardDescription className="text-blue-700/90 dark:text-blue-300/90">
-                {result.message ?? "Quiz submission processed."}
-              </CardDescription>
+              <CardTitle className="text-lg">Attempt Status</CardTitle>
+              <CardDescription>{message ?? "Your quiz session is tracked in real-time."}</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Badge variant="outline">Score: {result.score ?? "-"}</Badge>
-              <Badge variant="outline">Total: {result.total ?? "-"}</Badge>
-              <Badge
-                variant="outline"
-                className={
-                  result.passed == null
-                    ? ""
-                    : result.passed
-                    ? "border-emerald-300 text-emerald-700 dark:border-emerald-900/60 dark:text-emerald-300"
-                    : "border-rose-300 text-rose-700 dark:border-rose-900/60 dark:text-rose-300"
-                }
-              >
-                {result.passed == null ? "Result Pending" : result.passed ? "Passed" : "Failed"}
-              </Badge>
+            <CardContent className="space-y-4">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-4 dark:border-blue-900/60 dark:bg-blue-900/25">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">Time Remaining</p>
+                <p className="mt-1 text-4xl font-black tracking-wide text-blue-900 dark:text-blue-100 sm:text-5xl">{formatReadableTimer(remainingSeconds)}</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                <Badge variant="outline" className="flex items-center gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  {formatTimer(remainingSeconds)}
+                </Badge>
+                <Badge variant="outline">{answeredCount} answered</Badge>
+                </div>
+                {!started && !result ? (
+                  <Button type="button" onClick={() => void handleStart()} disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+                    Start Quiz
+                  </Button>
+                ) : null}
+                {started && !result ? (
+                  <Button type="button" onClick={() => void submitAttempt(false)} disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    Submit Quiz
+                  </Button>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
-        ) : null}
 
-        <div className="space-y-4">
-          {questions.map((question, index) => {
-            const answerKey = String(question.id);
-            return (
-              <Card key={question.id || index}>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    {index + 1}. {question.prompt}
-                  </CardTitle>
-                  <CardDescription>{question.points} point(s)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {question.choices.length > 0 ? (
-                    <div className="space-y-2">
-                      {question.choices.map((choice) => (
-                        <label
-                          key={`${question.id}-${choice.id}`}
-                          className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/15"
-                        >
-                          <input
-                            type="radio"
-                            name={`question-${question.id}`}
-                            value={choice.id}
-                            checked={answers[answerKey] === choice.id}
-                            disabled={!started || Boolean(result)}
-                            onChange={(event) =>
-                              setAnswers((prev) => ({
-                                ...prev,
-                                [answerKey]: event.target.value,
-                              }))
-                            }
-                          />
-                          <span>{choice.text}</span>
-                        </label>
-                      ))}
+          {/* ────── Entrance Exam: "Results will be emailed" ────── */}
+          {isEntranceResult ? (
+            <Card className="border-blue-200 bg-gradient-to-br from-blue-50/80 to-cyan-50/60 dark:border-blue-900/60 dark:from-blue-900/20 dark:to-cyan-900/15">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Exam Submitted Successfully
+                </CardTitle>
+                <CardDescription className="text-blue-700/90 dark:text-blue-300/90">
+                  {result.message ?? "Your entrance exam has been submitted."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {finalRemainingSeconds !== null && quiz && (
+                  <div className="flex flex-wrap items-center gap-4 rounded-xl border border-blue-200 bg-white/50 p-4 dark:border-blue-800/40 dark:bg-slate-900/40">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Time Taken</p>
+                      <p className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                        {formatReadableTimer(quiz.durationMinutes * 60 - finalRemainingSeconds)}
+                      </p>
                     </div>
-                  ) : (
-                    <Textarea
-                      value={answers[answerKey] ?? ""}
-                      disabled={!started || Boolean(result)}
-                      onChange={(event) =>
-                        setAnswers((prev) => ({
-                          ...prev,
-                          [answerKey]: event.target.value,
-                        }))
-                      }
-                      placeholder="Type your answer..."
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </main>
-    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Remaining</p>
+                      <p className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                        {formatReadableTimer(finalRemainingSeconds)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-white/70 p-4 dark:border-blue-800/50 dark:bg-slate-900/50">
+                  <Mail className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-300" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      Results will be sent to your email
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      You will receive an email notification with the results of your entrance examination. Please check your inbox (and spam folder) regularly.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  You may now close this page. Thank you for taking the entrance exam!
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {/* ────── Regular Quiz: show score result ────── */}
+          {showScoreResult ? (
+            <Card className="border-blue-200 bg-blue-50/70 dark:border-blue-900/60 dark:bg-blue-900/20">
+              <CardHeader>
+                <CardTitle className="text-blue-800 dark:text-blue-200">Submission Result</CardTitle>
+                <CardDescription className="text-blue-700/90 dark:text-blue-300/90">
+                  {result.message ?? "Quiz submission processed."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Badge variant="outline">Score: {result.score ?? "-"}</Badge>
+                <Badge variant="outline">Total: {result.total ?? "-"}</Badge>
+                <Badge
+                  variant="outline"
+                  className={
+                    result.passed == null
+                      ? ""
+                      : result.passed
+                      ? "border-emerald-300 text-emerald-700 dark:border-emerald-900/60 dark:text-emerald-300"
+                      : "border-rose-300 text-rose-700 dark:border-rose-900/60 dark:text-rose-300"
+                  }
+                >
+                  {result.passed == null ? "Result Pending" : result.passed ? "Passed" : "Failed"}
+                </Badge>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <div className="space-y-4">
+            {questions.map((question, index) => {
+              const answerKey = String(question.id);
+              return (
+                <Card key={question.id || index}>
+                  <CardHeader>
+                    <CardTitle className="text-base">
+                      {index + 1}. {question.prompt}
+                    </CardTitle>
+                    <CardDescription>{question.points} point(s)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {question.choices.length > 0 ? (
+                      <div className="space-y-2">
+                        {question.choices.map((choice) => (
+                          <label
+                            key={`${question.id}-${choice.id}`}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/15"
+                          >
+                            <input
+                              type="radio"
+                              name={`question-${question.id}`}
+                              value={choice.id}
+                              checked={answers[answerKey] === choice.id}
+                              disabled={!started || Boolean(result)}
+                              onChange={(event) =>
+                                setAnswers((prev) => ({
+                                  ...prev,
+                                  [answerKey]: event.target.value,
+                                }))
+                              }
+                            />
+                            <span>{choice.text}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <Textarea
+                        value={answers[answerKey] ?? ""}
+                        disabled={!started || Boolean(result)}
+                        onChange={(event) =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [answerKey]: event.target.value,
+                          }))
+                        }
+                        placeholder="Type your answer..."
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </main>
+      </div>
+    </>
   );
 }

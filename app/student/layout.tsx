@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import { StudentTopNav } from "@/components/student/top-nav";
+import { StudentTopNavWrapper } from "@/components/student/top-nav-wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,7 +25,7 @@ export default function StudentLayout({
 }>) {
   return (
     <div className={`${geistSans.variable} ${geistMono.variable} student-page min-h-screen antialiased`}>
-      <StudentTopNav />
+      <StudentTopNavWrapper />
       <div className="pt-16 pb-24 md:pb-0">{children}</div>
     </div>
   );

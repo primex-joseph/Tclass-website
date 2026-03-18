@@ -88,6 +88,7 @@ export type QuizPlayable = {
   shuffleChoices: boolean;
   publishedAt: string | null;
   expiresAt: string | null;
+  quizType?: "regular" | "entrance";
 };
 
 export type QuizPreviewResponse = {
@@ -897,6 +898,7 @@ function normalizeAttemptSummary(raw: unknown): QuizAttemptSummary | null {
 
 function normalizePlayable(raw: unknown): QuizPlayable {
   const row = (raw ?? {}) as PlainObject;
+  const rawQuizType = String(row.quiz_type ?? row.quizType ?? "regular").toLowerCase();
   return {
     id: asNumber(row.id ?? row.quiz_id, 0),
     title: asString(row.title, "Quiz"),
@@ -907,6 +909,7 @@ function normalizePlayable(raw: unknown): QuizPlayable {
     shuffleChoices: typeof row.shuffle_choices === "boolean" ? row.shuffle_choices : true,
     publishedAt: asNullableString(row.published_at),
     expiresAt: asNullableString(row.expires_at),
+    quizType: rawQuizType === "entrance" ? "entrance" : "regular",
   };
 }
 
